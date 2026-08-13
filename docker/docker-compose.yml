@@ -1,0 +1,153 @@
+x-common-env: &common-env
+  TZ: Asia/Shanghai
+  SERVER_PORT: "8080"
+  SPRING_PROFILES_ACTIVE: prod
+  NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:?NACOS_SERVER_ADDR is required}
+  NACOS_NAMESPACE: ${NACOS_NAMESPACE:?NACOS_NAMESPACE is required}
+  NACOS_USERNAME: ${NACOS_USERNAME:?NACOS_USERNAME is required}
+  NACOS_PASSWORD: ${NACOS_PASSWORD:?NACOS_PASSWORD is required}
+  NACOS_DISCOVERY_GROUP: DEFAULT_GROUP
+  NACOS_CONFIG_GROUP: ${NACOS_CONFIG_GROUP:-DEFAULT_GROUP}
+  POSTGRES_HOST: ${POSTGRES_HOST:?POSTGRES_HOST is required}
+  PLATFORM_DB_PORT: ${PLATFORM_DB_PORT:-15432}
+  PLATFORM_DB_NAME: ${PLATFORM_DB_NAME:-ai_platform}
+  PLATFORM_DB_USERNAME: ${PLATFORM_DB_USERNAME:?PLATFORM_DB_USERNAME is required}
+  PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD:?PLATFORM_DB_PASSWORD is required}
+  PLATFORM_ENCRYPT_KEY: ${PLATFORM_ENCRYPT_KEY:?PLATFORM_ENCRYPT_KEY is required}
+  REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required}
+  REDIS_PORT: ${REDIS_PORT:-16379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:?KAFKA_BOOTSTRAP_SERVERS is required}
+  KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:?KAFKA_SECURITY_PROTOCOL is required}
+  KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:?KAFKA_SASL_MECHANISM is required}
+  KAFKA_USERNAME: ${KAFKA_USERNAME:?KAFKA_USERNAME is required}
+  KAFKA_PASSWORD: ${KAFKA_PASSWORD:?KAFKA_PASSWORD is required}
+  TRUSTED_FORWARD_TOKEN: ${TRUSTED_FORWARD_TOKEN:?TRUSTED_FORWARD_TOKEN is required}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks: [ai-runtime]
+  tmpfs:
+    - /app/.runtime:rw,nosuid,nodev,noexec,size=128m,uid=10001,gid=10001,mode=0750
+  logging:
+    driver: json-file
+    options: {max-size: 20m, max-file: "2"}
+
+services:
+  powerjob-server:
+    image: powerjob/powerjob-server:v5.1.2
+    container_name: powerjob-server
+    restart: unless-stopped
+    environment:
+      JVMOPTIONS: "-Xms256m -Xmx768m -XX:MaxMetaspaceSize=256m"
+      PARAMS: >-
+        --spring.profiles.active=product
+        --spring.datasource.core.driver-class-name=org.postgresql.Driver
+        --spring.datasource.core.jdbc-url=jdbc:postgresql://${POWERJOB_DB_HOST:?POWERJOB_DB_HOST is required}:${POWERJOB_DB_PORT:-15432}/${POWERJOB_DB_NAME:-powerjob}
+        --spring.datasource.core.username=${POWERJOB_DB_USERNAME:?POWERJOB_DB_USERNAME is required}
+        --spring.datasource.core.password=${POWERJOB_DB_PASSWORD:?POWERJOB_DB_PASSWORD is required}
+        --spring.datasource.core.maximum-pool-size=10
+        --spring.datasource.core.minimum-idle=2
+        --spring.datasource.remote.hibernate.properties.hibernate.dialect=tech.powerjob.server.persistence.config.dialect.PowerJobPGDialect
+        --oms.auth.initiliaze.admin.password=${POWERJOB_ADMIN_PASSWORD:?POWERJOB_ADMIN_PASSWORD is required}
+        --oms.auth.openapi.enable=true
+        --oms.instanceinfo.retention=7
+        --oms.container.retention.local=7
+        --oms.container.retention.remote=-1
+    volumes:
+      - powerjob-data:/root/powerjob/server
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:7700/ >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    mem_limit: 1g
+    cpus: 1.5
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "5"}
+    networks: [ai-runtime]
+
+  platform-agent:
+    <<: *service-defaults
+    image: ai-platform-agent:current
+    container_name: platform-agent
+    build: {context: .., dockerfile: docker/Dockerfile, pull: true, args: {RUNTIME_IMAGE: "${JAVA_RUNTIME_IMAGE:-container-registry.oracle.com/graalvm/jdk:25.0.4}", RUNTIME_SETUP_COMMAND: "${JAVA_RUNTIME_SETUP_COMMAND:-true}", JAR_FILE: platform-modules/platform-agent/build/libs/platform-agent-1.0.0-SNAPSHOT.jar, SERVICE_NAME: platform-agent}}
+    environment:
+      <<: *common-env
+      PLATFORM_REDIS_DATABASE: ${PLATFORM_REDIS_DATABASE:-3}
+      AGENT_ASR_API_KEY: ${AGENT_ASR_API_KEY:-}
+    mem_limit: 1g
+
+  platform-system:
+    <<: *service-defaults
+    image: ai-platform-system:current
+    container_name: platform-system
+    build: {context: .., dockerfile: docker/Dockerfile, pull: true, args: {RUNTIME_IMAGE: "${JAVA_RUNTIME_IMAGE:-container-registry.oracle.com/graalvm/jdk:25.0.4}", RUNTIME_SETUP_COMMAND: "${JAVA_RUNTIME_SETUP_COMMAND:-true}", JAR_FILE: platform-modules/platform-system/build/libs/platform-system-1.0.0-SNAPSHOT.jar, SERVICE_NAME: platform-system}}
+    environment: *common-env
+    mem_limit: 1500m
+
+  platform-files:
+    <<: *service-defaults
+    image: ai-platform-files:current
+    container_name: platform-files
+    build: {context: .., dockerfile: docker/Dockerfile, pull: true, args: {RUNTIME_IMAGE: "${JAVA_RUNTIME_IMAGE:-container-registry.oracle.com/graalvm/jdk:25.0.4}", RUNTIME_SETUP_COMMAND: "${JAVA_RUNTIME_SETUP_COMMAND:-true}", JAR_FILE: platform-modules/platform-files/build/libs/platform-files-1.0.0-SNAPSHOT.jar, SERVICE_NAME: platform-files}}
+    environment:
+      <<: *common-env
+      OSS_HOST: ${OSS_HOST:?OSS_HOST is required}
+      OSS_PORT: ${OSS_PORT:-18333}
+      OSS_ACCESS_KEY: ${OSS_ACCESS_KEY:?OSS_ACCESS_KEY is required}
+      OSS_SECRET_KEY: ${OSS_SECRET_KEY:?OSS_SECRET_KEY is required}
+    mem_limit: 1g
+
+  platform-sse:
+    <<: *service-defaults
+    image: ai-platform-sse:current
+    container_name: platform-sse
+    build: {context: .., dockerfile: docker/Dockerfile, pull: true, args: {RUNTIME_IMAGE: "${JAVA_RUNTIME_IMAGE:-container-registry.oracle.com/graalvm/jdk:25.0.4}", RUNTIME_SETUP_COMMAND: "${JAVA_RUNTIME_SETUP_COMMAND:-true}", JAR_FILE: platform-modules/platform-sse/build/libs/platform-sse-1.0.0-SNAPSHOT.jar, SERVICE_NAME: platform-sse}}
+    environment: *common-env
+    mem_limit: 1g
+
+  platform-scheduler:
+    <<: *service-defaults
+    image: ai-platform-scheduler:current
+    container_name: platform-scheduler
+    build: {context: .., dockerfile: docker/Dockerfile, pull: true, args: {RUNTIME_IMAGE: "${JAVA_RUNTIME_IMAGE:-container-registry.oracle.com/graalvm/jdk:25.0.4}", RUNTIME_SETUP_COMMAND: "${JAVA_RUNTIME_SETUP_COMMAND:-true}", JAR_FILE: platform-modules/platform-scheduler/build/libs/platform-scheduler-1.0.0-SNAPSHOT.jar, SERVICE_NAME: platform-scheduler}}
+    environment:
+      <<: *common-env
+      POWERJOB_SERVER_ADDRESS: powerjob-server:7700
+    depends_on:
+      powerjob-server:
+        condition: service_healthy
+    mem_limit: 1g
+
+  platform-auth:
+    <<: *service-defaults
+    image: ai-platform-auth:current
+    container_name: platform-auth
+    build: {context: .., dockerfile: docker/Dockerfile, pull: true, args: {RUNTIME_IMAGE: "${JAVA_RUNTIME_IMAGE:-container-registry.oracle.com/graalvm/jdk:25.0.4}", RUNTIME_SETUP_COMMAND: "${JAVA_RUNTIME_SETUP_COMMAND:-true}", JAR_FILE: platform-auth/build/libs/platform-auth-1.0.0-SNAPSHOT.jar, SERVICE_NAME: platform-auth}}
+    environment:
+      <<: *common-env
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?JWT_PRIVATE_KEY is required}
+      PLATFORM_SUPER_ADMIN_ENABLED: ${PLATFORM_SUPER_ADMIN_ENABLED:-false}
+      PLATFORM_SUPER_ADMIN_USERNAME: ${PLATFORM_SUPER_ADMIN_USERNAME:-}
+      PLATFORM_SUPER_ADMIN_PASSWORD_HASH: ${PLATFORM_SUPER_ADMIN_PASSWORD_HASH:-}
+    mem_limit: 1g
+
+  platform-gateway:
+    <<: *service-defaults
+    image: ai-platform-gateway:current
+    container_name: platform-gateway
+    build: {context: .., dockerfile: docker/Dockerfile, pull: true, args: {RUNTIME_IMAGE: "${JAVA_RUNTIME_IMAGE:-container-registry.oracle.com/graalvm/jdk:25.0.4}", RUNTIME_SETUP_COMMAND: "${JAVA_RUNTIME_SETUP_COMMAND:-true}", JAR_FILE: platform-gateway/build/libs/platform-gateway-1.0.0-SNAPSHOT.jar, SERVICE_NAME: platform-gateway}}
+    environment:
+      <<: *common-env
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?JWT_PUBLIC_KEY is required}
+    ports: ["${PLATFORM_GATEWAY_PORT:-18000}:8080"]
+    mem_limit: 1g
+
+networks:
+  ai-runtime: {external: true, name: ai-runtime}
+
+volumes:
+  powerjob-data:

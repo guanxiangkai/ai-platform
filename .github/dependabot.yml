@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    target-branch: main
+    groups:
+      spring-platform:
+        patterns:
+          - "org.springframework*"
+          - "com.alibaba.cloud*"
+      ai-plus:
+        patterns:
+          - "io.github.guanxiangkai*"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:30"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    target-branch: main

@@ -1,0 +1,125 @@
+package com.ai.agent.integration;
+
+import com.ai.agent.domain.AgentInvocationMode;
+import com.ai.agent.domain.AgentProviderType;
+import com.ai.agent.domain.entity.AgentConfig;
+import com.ai.api.agent.AgentApiHeaders;
+import io.github.guanxiangkai.web.plus.error.exception.BizException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.reactive.function.client.WebClient;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
+
+import java.util.Map;
+
+/**
+ * Dify 对话与工作流应用协议适配器。
+ *
+ * @author guanxiangkai
+ * @since 1.0.0
+ */
+@Component
+@RequiredArgsConstructor
+public class DifyAgentClient implements AgentProviderClient {
+    private static final ParameterizedTypeReference<ServerSentEvent<String>> CHAT_EVENT_TYPE =
+            new ParameterizedTypeReference<>() { };
+
+    private final WebClient.Builder webClientBuilder;
+    private final ObjectMapper objectMapper;
+
+    @Override
+    public AgentProviderType providerType() {
+        return AgentProviderType.DIFY;
+    }
+
+    @Override
+    public AgentProviderResult invoke(AgentConfig definition, AgentProviderInvocation invocation) {
+        var request = invocation.request();
+        ObjectNode body = objectMapper.createObjectNode();
+        body.set("inputs", objectMapper.valueToTree(request.variables() == null ? Map.of() : request.variables()));
+        body.put("response_mode", responseMode(definition.getInvocationMode()));
+        body.put("user", invocation.userId());
+        if (definition.getInvocationMode() == AgentInvocationMode.CHAT) {
+            body.put("query", request.message());
+            if (StringUtils.hasText(invocation.providerConversationId())) {
+                body.put("conversation_id", invocation.providerConversationId());
+            }
+        }
+        if (definition.getInvocationMode() == AgentInvocationMode.CHAT) {
+            return invokeChat(definition, invocation, body);
+        }
+        JsonNode response = webClientBuilder.build().post().uri(endpoint(definition))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + definition.getCredential())
+                .header(AgentApiHeaders.IDEMPOTENCY_KEY, invocation.invocationId())
+                .bodyValue(body).retrieve().bodyToMono(JsonNode.class)
+                .block(ProviderJsonSupport.timeout(objectMapper, definition));
+        String text = extractWorkflowText(response);
+        if (!StringUtils.hasText(text)) throw new BizException("Dify 应用未返回有效文本");
+        JsonNode metadata = response == null ? null : response.get("metadata");
+        JsonNode usage = metadata == null ? null : metadata.get("usage");
+        return new AgentProviderResult(text,
+                firstInteger(usage, "prompt_tokens", "input_tokens"),
+                firstInteger(usage, "completion_tokens", "output_tokens"),
+                null);
+    }
+
+    private AgentProviderResult invokeChat(
+            AgentConfig definition,
+            AgentProviderInvocation invocation,
+            ObjectNode body) {
+        DifyChatStreamAccumulator result = webClientBuilder.build().post().uri(endpoint(definition))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + definition.getCredential())
+                .header(AgentApiHeaders.IDEMPOTENCY_KEY, invocation.invocationId())
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToFlux(CHAT_EVENT_TYPE)
+                .map(ServerSentEvent::data)
+                .filter(StringUtils::hasText)
+                .reduce(new DifyChatStreamAccumulator(objectMapper), DifyChatStreamAccumulator::accept)
+                .block(ProviderJsonSupport.timeout(objectMapper, definition));
+        if (result == null) throw new BizException("Dify 应用未返回流式事件");
+        return result.result();
+    }
+
+    /** Dify Agent Chat 只支持 streaming，工作流使用 blocking。 */
+    static String responseMode(AgentInvocationMode mode) {
+        return mode == AgentInvocationMode.CHAT ? "streaming" : "blocking";
+    }
+
+    private String endpoint(AgentConfig definition) {
+        String endpoint = definition.getEndpointUrl().replaceAll("/+$", "");
+        if (endpoint.endsWith("/chat-messages") || endpoint.endsWith("/workflows/run")) return endpoint;
+        String suffix = definition.getInvocationMode() == AgentInvocationMode.WORKFLOW
+                ? "/workflows/run" : "/chat-messages";
+        return endpoint.endsWith("/v1") ? endpoint + suffix : endpoint + "/v1" + suffix;
+    }
+
+    private String extractWorkflowText(JsonNode response) {
+        if (response == null) return null;
+        JsonNode data = response.get("data");
+        JsonNode outputs = data == null ? null : data.get("outputs");
+        if (outputs == null || !outputs.isObject()) return null;
+        for (String key : new String[]{"text", "answer", "result", "output"}) {
+            String value = ProviderJsonSupport.text(outputs, key);
+            if (StringUtils.hasText(value)) return value;
+        }
+        try {
+            return objectMapper.writeValueAsString(outputs);
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    private Integer firstInteger(JsonNode value, String first, String second) {
+        Integer result = ProviderJsonSupport.integer(value, first);
+        return result == null ? ProviderJsonSupport.integer(value, second) : result;
+    }
+}

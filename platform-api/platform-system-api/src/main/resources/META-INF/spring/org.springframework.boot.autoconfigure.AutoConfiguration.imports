@@ -1,0 +1,2 @@
+com.ai.api.system.config.SystemClientConfig
+com.ai.api.system.log.OperationLogRedisAutoConfiguration
