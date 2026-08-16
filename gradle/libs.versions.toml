@@ -21,7 +21,7 @@ postgresql = "42.7.13"         # PostgreSQL JDBC 驱动
 caffeine = "3.2.4"          # Caffeine 本地缓存（一级缓存 / L1）
 
 # ─────────────────────────── 日志 ────────────────────────────────
-logback = "1.6.1"         # Logback 日志实现
+logback = "1.6.2"         # Logback 日志实现
 
 # ─────────────────────────── API 文档 ────────────────────────────
 springdoc = "3.1.0"          # SpringDoc OpenAPI（Swagger UI，兼容 Boot 4+）
