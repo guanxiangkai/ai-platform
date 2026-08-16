@@ -28,9 +28,9 @@ class RegistrationOutboxContractTest {
                 .resolve("platform-modules/platform-system/src/main/java/com/ai/system/service");
         String processor = Files.readString(sourceDirectory.resolve("RegistrationOutboxProcessor.java"));
         String transactionService = Files.readString(sourceDirectory.resolve("RegistrationOutboxTransactionService.java"));
-        assertThat(processor).contains("directoryClient.currentAssignment", "directoryClient.linkUser");
+        assertThat(processor).contains("workforceClient.currentPosition", "workforceClient.bindUser");
         assertThat(processor).doesNotContain("@Transactional");
-        assertThat(transactionService).doesNotContain("directoryClient.");
+        assertThat(transactionService).doesNotContain("workforceClient.");
     }
 
     private Path projectRoot() {

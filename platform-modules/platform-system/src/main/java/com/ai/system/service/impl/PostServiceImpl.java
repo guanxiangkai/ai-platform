@@ -235,7 +235,7 @@ public class PostServiceImpl extends BaseServiceImpl<PostPageDTO, PostPageVO, Po
         if (authUserCacheService != null) {
             authUserCacheService.refreshAfterCommit(userId, null, true);
         }
-        log.info("用户 {} 切换岗位为 {}", userId, targetPost.getId());
+        log.info("当前用户岗位切换完成");
     }
 
     @Override

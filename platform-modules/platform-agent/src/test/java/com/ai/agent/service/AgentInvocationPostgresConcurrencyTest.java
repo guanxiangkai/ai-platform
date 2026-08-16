@@ -6,6 +6,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -22,10 +24,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AgentInvocationPostgresConcurrencyTest {
 
     @Container
-    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18.4");
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:latest");
 
     @BeforeAll
     static void createAgentInvocationSchema() throws Exception {
+        String baseline = Files.readString(repositoryRoot()
+                .resolve("deploy/database/V001__create_platform_schema.sql"));
         try (Connection connection = connection()) {
             execute(connection, """
                     CREATE TABLE public.ai_agent_config (
@@ -34,74 +38,12 @@ class AgentInvocationPostgresConcurrencyTest {
                         CONSTRAINT uk_agent_config_tenant_id UNIQUE (tenant_id, id)
                     )
                     """);
-            execute(connection, """
-                    CREATE TABLE public.ai_agent_session_record (
-                        id varchar(64) PRIMARY KEY,
-                        deleted boolean NOT NULL,
-                        version bigint NOT NULL,
-                        enabled boolean NOT NULL,
-                        tenant_id varchar(64) NOT NULL,
-                        session_code varchar(128) NOT NULL,
-                        agent_id varchar(64) NOT NULL,
-                        agent_code varchar(128) NOT NULL,
-                        user_id varchar(64) NOT NULL,
-                        message_count integer NOT NULL,
-                        session_state varchar(32) NOT NULL,
-                        started_at timestamptz NOT NULL,
-                        active_invocation_id varchar(128)
-                    )
-                    """);
-            execute(connection, """
-                    CREATE TABLE public.ai_agent_message_record (
-                        id varchar(64) PRIMARY KEY,
-                        deleted boolean NOT NULL,
-                        version bigint NOT NULL,
-                        tenant_id varchar(64) NOT NULL,
-                        invocation_id varchar(128) NOT NULL,
-                        session_id varchar(64) NOT NULL,
-                        sequence_no integer NOT NULL,
-                        role varchar(32) NOT NULL,
-                        content text NOT NULL
-                    )
-                    """);
-            execute(connection, """
-                    CREATE TABLE public.ai_agent_call_record (
-                        id varchar(64) PRIMARY KEY,
-                        deleted boolean NOT NULL,
-                        version bigint NOT NULL,
-                        enabled boolean NOT NULL,
-                        tenant_id varchar(64) NOT NULL,
-                        invocation_code varchar(128) NOT NULL,
-                        request_fingerprint varchar(128) NOT NULL,
-                        execution_token varchar(128) NOT NULL,
-                        lease_expires_at timestamptz NOT NULL,
-                        attempt_count integer NOT NULL,
-                        session_id varchar(64) NOT NULL,
-                        user_message_id varchar(64) NOT NULL,
-                        reserved_user_sequence_no integer NOT NULL,
-                        reserved_assistant_sequence_no integer NOT NULL,
-                        agent_id varchar(64) NOT NULL,
-                        agent_code varchar(128) NOT NULL,
-                        provider_type varchar(32) NOT NULL,
-                        operation varchar(32) NOT NULL,
-                        invocation_state varchar(32) NOT NULL
-                    )
-                    """);
-            execute(connection, """
-                    CREATE UNIQUE INDEX uk_ai_agent_message_session_sequence_active
-                    ON public.ai_agent_message_record (tenant_id, session_id, sequence_no)
-                    WHERE deleted = false
-                    """);
-            execute(connection, """
-                    CREATE UNIQUE INDEX uk_ai_agent_message_invocation_role_active
-                    ON public.ai_agent_message_record (tenant_id, invocation_id, role)
-                    WHERE deleted = false
-                    """);
-            execute(connection, """
-                    CREATE UNIQUE INDEX uk_ai_agent_call_tenant_code_active
-                    ON public.ai_agent_call_record (tenant_id, invocation_code)
-                    WHERE deleted = false
-                    """);
+            execute(connection, createTable(baseline, "ai_agent_session_record"));
+            execute(connection, createTable(baseline, "ai_agent_message_record"));
+            execute(connection, createTable(baseline, "ai_agent_call_record"));
+            execute(connection, statement(baseline, "CREATE UNIQUE INDEX uk_ai_agent_message_session_sequence_active"));
+            execute(connection, statement(baseline, "CREATE UNIQUE INDEX uk_ai_agent_message_invocation_role_active"));
+            execute(connection, statement(baseline, "CREATE UNIQUE INDEX uk_ai_agent_call_tenant_code_active"));
             execute(connection, "INSERT INTO public.ai_agent_config (tenant_id, id) VALUES ('tenant-1', 'agent-1')");
             execute(connection, """
                     INSERT INTO public.ai_agent_session_record (
@@ -149,7 +91,7 @@ class AgentInvocationPostgresConcurrencyTest {
     }
 
     @Test
-    void schemaShouldExposeDatabaseIdempotencyAndSequenceConstraints() throws Exception {
+    void baselineShouldExposeDatabaseIdempotencyAndSequenceConstraints() throws Exception {
         try (Connection connection = connection();
              var statement = connection.prepareStatement("""
                      SELECT indexname
@@ -291,4 +233,24 @@ class AgentInvocationPostgresConcurrencyTest {
         }
     }
 
+    private static String createTable(String baseline, String tableName) {
+        return statement(baseline, "CREATE TABLE public." + tableName);
+    }
+
+    private static String statement(String baseline, String startText) {
+        int start = baseline.indexOf(startText);
+        if (start < 0) throw new IllegalStateException("数据库基线缺少语句: " + startText);
+        int end = baseline.indexOf(';', start);
+        if (end < 0) throw new IllegalStateException("数据库基线语句未结束: " + startText);
+        return baseline.substring(start, end + 1);
+    }
+
+    private static Path repositoryRoot() {
+        Path current = Path.of("").toAbsolutePath().normalize();
+        while (current != null && !Files.exists(current.resolve("settings.gradle.kts"))) {
+            current = current.getParent();
+        }
+        if (current == null) throw new IllegalStateException("未找到 ai-platform 仓库根目录");
+        return current;
+    }
 }

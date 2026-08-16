@@ -23,7 +23,7 @@ class TenantRouteGuardFilterTest {
         AiGatewayProperties properties = properties();
         TenantRouteGuardFilter filter = new TenantRouteGuardFilter(properties);
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/alpha/agent/session/1").build()
+                MockServerHttpRequest.get("/product-a/agent/session/1").build()
         );
         AtomicBoolean forwarded = new AtomicBoolean();
         AtomicInteger invocationCount = new AtomicInteger();
@@ -33,7 +33,7 @@ class TenantRouteGuardFilterTest {
                     forwarded.set(true);
                     return Mono.empty();
                 })
-                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication("tenant-alpha")))
+                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication("tenant-a")))
                 .block();
 
         assertThat(forwarded).isTrue();
@@ -45,7 +45,7 @@ class TenantRouteGuardFilterTest {
     void shouldRejectCrossTenantBusinessRoute() {
         TenantRouteGuardFilter filter = new TenantRouteGuardFilter(properties());
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/alpha/catalog/items").build()
+                MockServerHttpRequest.get("/product-a/business/plan").build()
         );
         AtomicBoolean forwarded = new AtomicBoolean();
 
@@ -53,7 +53,7 @@ class TenantRouteGuardFilterTest {
                     forwarded.set(true);
                     return Mono.empty();
                 })
-                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication("tenant-beta")))
+                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication("tenant-b")))
                 .block();
 
         assertThat(forwarded).isFalse();
@@ -80,7 +80,7 @@ class TenantRouteGuardFilterTest {
     void shouldAllowAnonymousTenantLoginRoute() {
         TenantRouteGuardFilter filter = new TenantRouteGuardFilter(properties());
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/beta/auth/login").build()
+                MockServerHttpRequest.post("/product-b/auth/login").build()
         );
         AtomicBoolean forwarded = new AtomicBoolean();
 
@@ -96,7 +96,7 @@ class TenantRouteGuardFilterTest {
     void shouldAllowAnonymousProductApiCryptoConfigRoute() {
         TenantRouteGuardFilter filter = new TenantRouteGuardFilter(properties());
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/beta/api/web-plus/api-crypto/config").build()
+                MockServerHttpRequest.get("/product-b/api/web-plus/api-crypto/config").build()
         );
         AtomicBoolean forwarded = new AtomicBoolean();
 
@@ -113,7 +113,7 @@ class TenantRouteGuardFilterTest {
     void shouldRejectAnonymousAdjacentWebPlusRoute() {
         TenantRouteGuardFilter filter = new TenantRouteGuardFilter(properties());
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/beta/api/web-plus/internal/config").build()
+                MockServerHttpRequest.get("/product-b/api/web-plus/internal/config").build()
         );
         AtomicBoolean forwarded = new AtomicBoolean();
 
@@ -129,12 +129,14 @@ class TenantRouteGuardFilterTest {
     private AiGatewayProperties properties() {
         AiGatewayProperties properties = new AiGatewayProperties();
         properties.setTenantPathIds(Map.of(
-                "alpha", "tenant-alpha",
-                "beta", "tenant-beta"
+                "product-a", "tenant-a",
+                "product-b", "tenant-b"
         ));
-        properties.setExcludePaths(List.of(
-                "/beta/auth/login",
-                "/beta/api/web-plus/api-crypto/config"
+        properties.setTenantExcludePaths(List.of(
+                "/product-a/auth/login",
+                "/product-b/auth/login",
+                "/product-a/api/web-plus/api-crypto/config",
+                "/product-b/api/web-plus/api-crypto/config"
         ));
         return properties;
     }

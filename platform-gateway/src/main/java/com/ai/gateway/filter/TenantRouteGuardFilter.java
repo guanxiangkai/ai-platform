@@ -22,8 +22,8 @@ import java.util.Map;
 /**
  * 校验租户业务路径与 JWT 租户是否一致。
  *
- * <p>由 {@link AiGatewayProperties#getTenantPathIds()} 配置的路径前缀对应不同租户。本过滤器在路由
- * 去除前缀之前读取原始路径，并拒绝跨租户 Token 访问，防止仅靠客户端导航形成伪隔离。</p>
+ * <p>产品入口前缀与租户的对应关系完全由 {@code ai.gateway.tenant-path-ids} 配置。
+ * 本过滤器在路由去除前缀之前读取原始路径，并拒绝跨租户 Token 访问，防止仅靠前端菜单形成伪隔离。</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -45,7 +45,8 @@ public class TenantRouteGuardFilter implements GlobalFilter, Ordered {
         if (!StringUtils.hasText(expectedTenantId)) {
             return chain.filter(exchange);
         }
-        if (GatewayPathMatcher.matchesAny(properties.getExcludePaths(), path)) {
+        if (GatewayPathMatcher.matchesAny(properties.getExcludePaths(), path)
+                || GatewayPathMatcher.matchesAny(properties.getTenantExcludePaths(), path)) {
             return chain.filter(exchange);
         }
 

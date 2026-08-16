@@ -4,8 +4,8 @@ import com.ai.system.domain.OutboxDeliveryState;
 import com.ai.system.domain.entity.Register;
 import com.ai.system.domain.entity.RegistrationOutbox;
 import com.ai.system.domain.entity.Role;
-import com.ai.system.integration.DirectoryAssignment;
-import com.ai.system.integration.TenantDirectoryClient;
+import com.ai.system.integration.TenantWorkforceClient;
+import com.ai.system.integration.WorkforcePosition;
 import com.ai.system.repository.RegistrationOutboxRepository;
 import com.ai.system.repository.RoleRepository;
 import com.ai.system.repository.RegisterOutboxTenantCatalog;
@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 处理已提交的注册开通任务；远程目录服务调用始终在数据库事务外执行。
+ * 处理已提交的注册开通任务；远程人员服务调用始终在数据库事务外执行。
  *
  * @author guanxiangkai
  * @since 1.0.0
@@ -32,7 +32,7 @@ import java.util.List;
 public class RegistrationOutboxProcessor {
     private final RegistrationOutboxRepository outboxRepository;
     private final RoleRepository roleRepository;
-    private final TenantDirectoryClient directoryClient;
+    private final TenantWorkforceClient workforceClient;
     private final RegisterOutboxTenantCatalog tenantCatalog;
     private final RegisterOutboxProperties properties;
     private final RegistrationOutboxTransactionService transactions;
@@ -50,7 +50,8 @@ public class RegistrationOutboxProcessor {
                     List.of(OutboxDeliveryState.PENDING, OutboxDeliveryState.RETRY, OutboxDeliveryState.PROCESSING),
                     now, PageRequest.of(0, properties.getBatchSize())).forEach(this::process));
         } catch (Exception exception) {
-            log.error("注册开通任务按租户调度失败: tenantId={}", tenantId, exception);
+            log.error("注册开通任务按租户调度失败: exception={}",
+                    exception.getClass().getSimpleName());
         }
     }
 
@@ -61,27 +62,24 @@ public class RegistrationOutboxProcessor {
             return;
         }
         try {
-            DirectoryAssignment assignment = directoryClient.currentAssignment(record.getDirectorySubjectId()).block();
-            Role role = resolveRole(assignment);
-            if (role == null || !Boolean.TRUE.equals(directoryClient.linkUser(
-                    record.getDirectorySubjectId(), record.getUserId()).block())) {
-                transactions.retry(event.getId(), "目录绑定或角色解析未完成");
+            WorkforcePosition position = workforceClient.currentPosition(record.getPersonnelId()).block();
+            Role role = resolveRole(position);
+            if (role == null || !Boolean.TRUE.equals(workforceClient.bindUser(record.getPersonnelId(), record.getUserId()).block())) {
+                transactions.retry(event.getId(), "人员绑定或角色解析未完成");
                 return;
             }
             transactions.activate(event.getId(), role.getId());
         } catch (Exception exception) {
-            transactions.retry(event.getId(), exception.getMessage());
+            transactions.retry(event.getId(), "人员开通依赖调用失败");
         }
     }
 
-    private Role resolveRole(DirectoryAssignment assignment) {
-        if (assignment != null && assignment.assignmentName() != null) {
-            String combined = (assignment.groupName() == null ? "" : assignment.groupName().trim())
-                    + assignment.assignmentName().trim();
+    private Role resolveRole(WorkforcePosition position) {
+        if (position != null && position.positionName() != null) {
+            String combined = (position.deptName() == null ? "" : position.deptName().trim()) + position.positionName().trim();
             Role matched = roleRepository.findFirstByRoleNameAndEnabledTrueAndDeletedFalse(combined).orElse(null);
             if (matched != null) return matched;
-            matched = roleRepository.findFirstByRoleNameAndEnabledTrueAndDeletedFalse(
-                    assignment.assignmentName().trim()).orElse(null);
+            matched = roleRepository.findFirstByRoleNameAndEnabledTrueAndDeletedFalse(position.positionName().trim()).orElse(null);
             if (matched != null) return matched;
         }
         return roleRepository.findFirstByDefaultRegistrationRoleTrueAndEnabledTrueAndDeletedFalse().orElse(null);

@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * ai-system 本地授权范围加载器。
+ * platform-system 本地授权范围加载器。
  * <p>
  * 下游认证过滤器建立租户上下文之前会调用本组件，因此这里只能读取由 system 侧维护的共享认证概要，
  * 不能查询受租户隔离的业务表。
@@ -59,7 +59,7 @@ public class SystemUserAuthorizationProvider implements UserAuthorizationProvide
         try {
             Map<Object, Object> hash = redisTemplate.opsForHash().entries(authKey(userId));
             if (hash == null || hash.isEmpty()) {
-                log.warn("系统服务未找到用户认证概要，按空授权范围处理: userId={}", userId);
+                log.warn("系统服务未找到用户认证概要，按空授权范围处理");
                 return AuthorizationScope.EMPTY;
             }
             return new AuthorizationScope(
@@ -68,7 +68,8 @@ public class SystemUserAuthorizationProvider implements UserAuthorizationProvide
                     stringSet(hash, AuthConstants.UserAuthCacheConstants.FIELD_DEPT_IDS)
             );
         } catch (Exception e) {
-            log.warn("系统服务加载用户授权范围失败，按空授权范围处理: userId={}", userId, e);
+            log.warn("系统服务加载用户授权范围失败，按空授权范围处理: exception={}",
+                    e.getClass().getSimpleName());
             return AuthorizationScope.EMPTY;
         }
     }
@@ -85,7 +86,8 @@ public class SystemUserAuthorizationProvider implements UserAuthorizationProvide
                     .filter(StringUtils::hasText)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
         } catch (Exception e) {
-            log.warn("解析用户授权范围字段失败: field={}", field, e);
+            log.warn("解析用户授权范围字段失败: field={}, exception={}",
+                    field, e.getClass().getSimpleName());
             return Set.of();
         }
     }

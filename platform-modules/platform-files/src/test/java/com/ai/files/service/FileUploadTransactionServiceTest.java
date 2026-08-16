@@ -4,6 +4,7 @@ import com.ai.files.config.FilesProperties;
 import com.ai.files.domain.FileNodeState;
 import com.ai.files.domain.FileNodeType;
 import com.ai.files.domain.FileSpaceType;
+import com.ai.files.domain.FileUploadState;
 import com.ai.files.domain.entity.FileNode;
 import com.ai.files.domain.entity.FileSpace;
 import com.ai.files.domain.entity.FileUploadRecord;
@@ -96,6 +97,28 @@ class FileUploadTransactionServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("当前文件已存在进行中的上传");
         verify(versions, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cleanupStateShouldNotPersistInfrastructureErrorDetails() {
+        FileUploadRecord upload = new FileUploadRecord();
+        upload.setId("upload-1");
+        upload.setTenantId("tenant-1");
+        upload.setExecutionToken("token-1");
+        upload.setUploadState(FileUploadState.PREPARED);
+        when(uploads.findLockedByIdAndTenantId("upload-1", "tenant-1"))
+                .thenReturn(Optional.of(upload));
+        var reservation = new FileUploadTransactionService.Reservation(
+                "upload-1", "tenant-1", "token-1", "object-key");
+
+        service.markCleanupPending(
+                reservation, new IllegalStateException("endpoint=https://private.example, token=secret"));
+
+        assertThat(upload.getUploadState()).isEqualTo(FileUploadState.CLEANUP_PENDING);
+        assertThat(upload.getLastError())
+                .isEqualTo("IllegalStateException")
+                .doesNotContain("private.example", "secret");
+        verify(uploads).save(upload);
     }
 
     private FileUploadTransactionService.UploadCommand command() {

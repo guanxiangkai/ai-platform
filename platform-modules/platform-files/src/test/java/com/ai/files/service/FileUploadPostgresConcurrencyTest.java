@@ -6,6 +6,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -21,90 +23,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FileUploadPostgresConcurrencyTest {
 
     @Container
-    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18.4");
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:latest");
 
     @BeforeAll
     static void createSchema() throws Exception {
+        String baseline = Files.readString(repositoryRoot()
+                .resolve("deploy/database/V001__create_platform_schema.sql"));
         try (Connection connection = connection()) {
-            execute(connection, """
-                    CREATE TABLE public.file_space (
-                        id varchar(64) PRIMARY KEY,
-                        deleted boolean NOT NULL,
-                        version bigint NOT NULL,
-                        tenant_id varchar(64) NOT NULL,
-                        enabled boolean NOT NULL,
-                        space_code varchar(128) NOT NULL,
-                        space_name varchar(128) NOT NULL,
-                        space_type varchar(32) NOT NULL,
-                        owner_user_id varchar(64),
-                        quota_bytes bigint NOT NULL,
-                        used_bytes bigint NOT NULL,
-                        reserved_bytes bigint NOT NULL
-                    )
-                    """);
-            execute(connection, """
-                    CREATE TABLE public.file_node (
-                        id varchar(64) PRIMARY KEY,
-                        deleted boolean NOT NULL,
-                        version bigint NOT NULL,
-                        tenant_id varchar(64) NOT NULL,
-                        enabled boolean NOT NULL,
-                        space_id varchar(64) NOT NULL,
-                        node_type varchar(32) NOT NULL,
-                        node_name varchar(255) NOT NULL,
-                        display_path text NOT NULL,
-                        node_state varchar(32) NOT NULL,
-                        active_upload_id varchar(64)
-                    )
-                    """);
-            execute(connection, """
-                    CREATE TABLE public.file_version (
-                        id varchar(64) PRIMARY KEY,
-                        deleted boolean NOT NULL,
-                        version bigint NOT NULL,
-                        tenant_id varchar(64) NOT NULL,
-                        enabled boolean NOT NULL,
-                        node_id varchar(64) NOT NULL,
-                        version_no integer NOT NULL,
-                        version_state varchar(32) NOT NULL,
-                        object_key varchar(512) NOT NULL,
-                        original_name varchar(255) NOT NULL,
-                        content_type varchar(255),
-                        size_bytes bigint NOT NULL,
-                        sha256 char(64) NOT NULL
-                    )
-                    """);
-            execute(connection, """
-                    CREATE TABLE public.file_upload_record (
-                        id varchar(64) PRIMARY KEY,
-                        deleted boolean NOT NULL,
-                        version bigint NOT NULL,
-                        tenant_id varchar(64) NOT NULL,
-                        enabled boolean NOT NULL,
-                        space_id varchar(64) NOT NULL,
-                        node_id varchar(64) NOT NULL,
-                        version_id varchar(64) NOT NULL,
-                        object_key varchar(512) NOT NULL,
-                        operator_user_id varchar(64) NOT NULL,
-                        reserved_bytes bigint NOT NULL,
-                        new_node boolean NOT NULL,
-                        upload_state varchar(32) NOT NULL,
-                        execution_token varchar(128) NOT NULL,
-                        lease_expires_at timestamptz NOT NULL,
-                        next_attempt_at timestamptz NOT NULL,
-                        attempt_count integer NOT NULL
-                    )
-                    """);
-            execute(connection, """
-                    CREATE UNIQUE INDEX uk_file_version_no_active
-                    ON public.file_version (tenant_id, node_id, version_no)
-                    WHERE deleted = false
-                    """);
-            execute(connection, """
-                    CREATE UNIQUE INDEX uk_file_upload_node_open
-                    ON public.file_upload_record (tenant_id, node_id)
-                    WHERE deleted = false AND upload_state = 'PREPARED'
-                    """);
+            execute(connection, statement(baseline, "CREATE TABLE public.file_space"));
+            execute(connection, statement(baseline, "CREATE TABLE public.file_node"));
+            execute(connection, statement(baseline, "CREATE TABLE public.file_version"));
+            execute(connection, statement(baseline, "CREATE TABLE public.file_upload_record"));
+            execute(connection, statement(baseline, "CREATE UNIQUE INDEX uk_file_version_no_active"));
+            execute(connection, statement(baseline, "CREATE UNIQUE INDEX uk_file_upload_node_open"));
             execute(connection, """
                     INSERT INTO public.file_space (
                         id, deleted, version, tenant_id, enabled, space_code, space_name, space_type,
@@ -297,4 +228,20 @@ class FileUploadPostgresConcurrencyTest {
         }
     }
 
+    private static String statement(String baseline, String startText) {
+        int start = baseline.indexOf(startText);
+        if (start < 0) throw new IllegalStateException("数据库基线缺少语句: " + startText);
+        int end = baseline.indexOf(';', start);
+        if (end < 0) throw new IllegalStateException("数据库基线语句未结束: " + startText);
+        return baseline.substring(start, end + 1);
+    }
+
+    private static Path repositoryRoot() {
+        Path current = Path.of("").toAbsolutePath().normalize();
+        while (current != null && !Files.exists(current.resolve("settings.gradle.kts"))) {
+            current = current.getParent();
+        }
+        if (current == null) throw new IllegalStateException("未找到 ai-platform 仓库根目录");
+        return current;
+    }
 }

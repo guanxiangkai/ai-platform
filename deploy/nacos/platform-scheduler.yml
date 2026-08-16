@@ -1,0 +1,47 @@
+# Data ID: platform-scheduler.yml
+# Group 由部署环境指定。
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  data:
+    redis:
+      host: ${redis.host}
+      port: ${redis.port}
+      password: ${redis.password}
+      database: ${redis.database}
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          url: ${db.url}
+          username: ${db.username}
+          password: ${db.password}
+          driver-class-name: ${db.driver-class-name}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+jpa-plus:
+  enabled: true
+
+web-plus:
+  log:
+    operation-log-enabled: true
+
+powerjob:
+  worker:
+    # 控制面不执行任何业务任务；Worker 只在具体产品业务服务中启用。
+    enabled: false
+
+platform:
+  scheduler:
+    max-page-size: ${SCHEDULER_MAX_PAGE_SIZE:200}
+    max-instance-time-limit-ms: ${SCHEDULER_MAX_INSTANCE_TIME_LIMIT_MS:604800000}
+    max-instance-count: ${SCHEDULER_MAX_INSTANCE_COUNT:1000}
+    max-concurrency: ${SCHEDULER_MAX_CONCURRENCY:1000}
+    max-retry-count: ${SCHEDULER_MAX_RETRY_COUNT:100}
+    min-fixed-interval-ms: ${SCHEDULER_MIN_FIXED_INTERVAL_MS:1000}
+    server-addresses: ${POWERJOB_SERVER_ADDRESSES}

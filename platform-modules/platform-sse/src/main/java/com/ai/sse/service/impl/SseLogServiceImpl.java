@@ -85,9 +85,10 @@ public class SseLogServiceImpl
             entry.setLogTime(connectTime != null ? connectTime : LocalDateTime.now());
             entry.setDescription("SSE 连接建立");
             repository.save(entry);
-            log.debug("[SseLog] CONNECT 已记录: connId={}, userId={}", connectionId, userId);
+            log.debug("[SseLog] CONNECT 已记录: connId={}", connectionId);
         } catch (Exception e) {
-            log.error("[SseLog] 记录 CONNECT 失败: connId={}", connectionId, e);
+            log.error("[SseLog] 记录 CONNECT 失败: connId={}, exception={}",
+                    connectionId, e.getClass().getSimpleName());
         }
     }
 
@@ -106,7 +107,8 @@ public class SseLogServiceImpl
             repository.save(entry);
             log.debug("[SseLog] DISCONNECT 已记录: connId={}, reason={}", connectionId, disconnectReason);
         } catch (Exception e) {
-            log.error("[SseLog] 记录 DISCONNECT 失败: connId={}", connectionId, e);
+            log.error("[SseLog] 记录 DISCONNECT 失败: connId={}, exception={}",
+                    connectionId, e.getClass().getSimpleName());
         }
     }
 }

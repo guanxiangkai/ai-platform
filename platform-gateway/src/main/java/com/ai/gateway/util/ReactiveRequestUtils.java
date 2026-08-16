@@ -1,17 +1,16 @@
 package com.ai.gateway.util;
 
-import cn.hutool.core.util.StrUtil;
-import com.ai.gateway.constant.GatewayConstants;
+import io.github.guanxiangkai.web.plus.core.util.IpUtils;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+
+import java.util.Collection;
 
 /**
  * 响应式请求工具类
  * <p>
  * 提供在 WebFlux 环境下提取客户端 IP 等通用能力。
  * <br/>
- * Hutool 的 {@code JakartaServletUtil.getClientIP()} 仅支持 Servlet，
- * 此类参照其实现逻辑适配 {@link ServerHttpRequest}，
- * 复用 {@link StrUtil} 做字符串处理，不重复造轮子。
+ * 复用 Web Plus 的可信代理算法，避免各过滤器直接信任客户端可伪造的转发请求头。
  * </p>
  *
  * @author guanxiangkai
@@ -23,27 +22,13 @@ public final class ReactiveRequestUtils {
     }
 
     /**
-     * 获取客户端真实 IP
-     * <p>
-     * 按优先级遍历代理请求头，取第一个有效值；
-     * 均无效时回退到 {@code RemoteAddress}。
-     * </p>
+     * 按显式可信代理列表获取客户端 IP。
      *
      * @param request 响应式请求对象
-     * @return 客户端 IP
+     * @param trustedProxyIps 可以提供转发头的精确代理 IP 列表
+     * @return 规范化客户端 IP；无法解析时返回 {@code unknown}
      */
-    public static String getClientIp(ServerHttpRequest request) {
-        for (String header : GatewayConstants.HeaderConstants.CLIENT_IP_HEADERS) {
-            String ip = request.getHeaders().getFirst(header);
-            if (StrUtil.isNotBlank(ip) && !StrUtil.equalsIgnoreCase(ip, "unknown")) {
-                // 多级代理时取第一个 IP（如 "1.1.1.1, 2.2.2.2" → "1.1.1.1"）
-                return StrUtil.trim(StrUtil.subBefore(ip, ',', false));
-            }
-        }
-
-        // 兜底：直连 IP
-        return request.getRemoteAddress() != null
-                ? request.getRemoteAddress().getAddress().getHostAddress()
-                : "unknown";
+    public static String getClientIp(ServerHttpRequest request, Collection<String> trustedProxyIps) {
+        return IpUtils.getClientIp(request, trustedProxyIps);
     }
 }

@@ -1,6 +1,5 @@
 package com.ai.auth.service.impl;
 
-import com.ai.api.security.PlatformAuthCacheKeys;
 import com.ai.api.security.PlatformSuperAdmin;
 import com.ai.auth.crypto.RsaJwtServiceImpl;
 import com.ai.auth.domain.AuthUserSnapshot;
@@ -14,6 +13,7 @@ import com.ai.auth.service.IAuthService;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import io.github.guanxiangkai.web.plus.core.exception.BaseException;
 import io.github.guanxiangkai.web.plus.log.annotation.LoginLog;
+import io.github.guanxiangkai.web.plus.core.crypto.SecurityFingerprint;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -69,7 +69,8 @@ public class AuthServiceImpl implements IAuthService {
         ServerHttpRequest serverRequest = exchange.getRequest();
         return Mono.fromRunnable(() -> authProtectionService.assertLoginAllowed(request.username(), serverRequest))
                 .subscribeOn(Schedulers.boundedElastic())
-                .then(loadLoginUser(request.username(), request.password(), serverRequest))
+                .then(loadLoginUser(request.username(), request.password()))
+                .map(user -> validatePortalTenant(user, serverRequest))
                 .flatMap(user -> rotateTokenVersion(user).map(user::withTokenVersion))
                 .flatMap(user -> generateTokensAndResponse(user))
                 .doOnNext(response -> authProtectionService.recordLoginSuccess(request.username(), serverRequest))
@@ -81,32 +82,20 @@ public class AuthServiceImpl implements IAuthService {
                 });
     }
 
-    private Mono<AuthUserSnapshot> loadLoginUser(
-            String username,
-            String rawPassword,
-            ServerHttpRequest request) {
+    private Mono<AuthUserSnapshot> loadLoginUser(String username, String rawPassword) {
         if (isConfiguredSuperAdminUsername(username)) {
             return loadConfiguredSuperAdmin(rawPassword);
         }
-        String tenantId = requirePortalTenantId(request);
-        return loadAuthUserByUsername(tenantId, username)
-                .flatMap(user -> validateUserCredentials(user, rawPassword))
-                .map(user -> validatePortalTenant(user, tenantId));
+        return loadAuthUserByUsername(username)
+                .flatMap(user -> validateUserCredentials(user, rawPassword));
     }
 
-    private String requirePortalTenantId(ServerHttpRequest request) {
-        String tenantId = request.getHeaders().getFirst(AuthConstants.HeaderConstants.TENANT_ID);
-        if (!StringUtils.hasText(tenantId)) {
-            throw new BaseException.BusinessException("用户名或密码错误");
-        }
-        return tenantId.trim();
-    }
-
-    private AuthUserSnapshot validatePortalTenant(AuthUserSnapshot user, String expectedTenantId) {
+    private AuthUserSnapshot validatePortalTenant(AuthUserSnapshot user, ServerHttpRequest request) {
         if (isConfiguredSuperAdmin(user)) {
             return user;
         }
-        if (!expectedTenantId.equals(user.tenantId())) {
+        String expectedTenantId = request.getHeaders().getFirst(AuthConstants.HeaderConstants.TENANT_ID);
+        if (!StringUtils.hasText(expectedTenantId) || !expectedTenantId.equals(user.tenantId())) {
             throw new BaseException.BusinessException("用户名或密码错误");
         }
         return user;
@@ -152,7 +141,7 @@ public class AuthServiceImpl implements IAuthService {
         return Mono.fromCallable(() -> {
                     try {
                         String token = extractToken(request);
-                        if (!StringUtils.hasText(token) || !jwtService.validateToken(token)) {
+                        if (!StringUtils.hasText(token) || !jwtService.validateAccessToken(token)) {
                             return new LogoutResult(false, null, "退出登录失败：Token 无效或已过期");
                         }
 
@@ -173,11 +162,12 @@ public class AuthServiceImpl implements IAuthService {
     }
 
     @Override
+    @LoginLog(entity = AuthLoginLogRecord.class, action = "REFRESH_TOKEN")
     public Mono<LoginResponse> refreshToken(String refreshToken, ServerWebExchange exchange) {
         ServerHttpRequest request = exchange.getRequest();
         return Mono.fromCallable(() -> {
                     authProtectionService.assertRefreshAllowed(refreshToken, request);
-                    if (!jwtService.validateToken(refreshToken)) {
+                    if (!jwtService.validateRefreshToken(refreshToken)) {
                         throw new BaseException.BusinessException("Refresh Token无效或已过期");
                     }
                     if (isInBlacklist(refreshToken)) {
@@ -196,7 +186,7 @@ public class AuthServiceImpl implements IAuthService {
 
                     String storedRefreshToken = redisTemplate.opsForValue()
                             .get(AuthConstants.TokenConstants.REFRESH_TOKEN_CACHE + ":" + userId);
-                    if (!refreshToken.equals(storedRefreshToken)) {
+                    if (!SecurityFingerprint.sha256(refreshToken).equals(storedRefreshToken)) {
                         throw new BaseException.BusinessException("Refresh Token不匹配");
                     }
                     return new RefreshTokenContext(userId, tokenVersion);
@@ -279,12 +269,12 @@ public class AuthServiceImpl implements IAuthService {
 
     // ==================== Redis 操作 ====================
 
-    private Mono<AuthUserSnapshot> loadAuthUserByUsername(String tenantId, String username) {
+    private Mono<AuthUserSnapshot> loadAuthUserByUsername(String username) {
         return Mono.fromCallable(() -> {
                     String userId = redisTemplate.opsForValue().get(
-                            PlatformAuthCacheKeys.usernameIndex(tenantId, username));
+                            AuthConstants.UserAuthCacheConstants.USERNAME_INDEX_PREFIX + username);
                     if (!StringUtils.hasText(userId)) {
-                        throw new BaseException.BusinessException("用户名或密码错误");
+                        throw new BaseException.BusinessException("用户状态异常，请联系管理员");
                     }
                     return loadAuthUser(userId);
                 })
@@ -394,9 +384,13 @@ public class AuthServiceImpl implements IAuthService {
         Duration refreshTtl = Duration.ofSeconds(jwtProperties.getRefreshTokenExpirationSeconds());
 
         redisTemplate.opsForValue().set(
-                AuthConstants.TokenConstants.TOKEN_CACHE + ":" + userId, accessToken, accessTtl);
+                AuthConstants.TokenConstants.TOKEN_CACHE + ":" + userId,
+                SecurityFingerprint.sha256(accessToken),
+                accessTtl);
         redisTemplate.opsForValue().set(
-                AuthConstants.TokenConstants.REFRESH_TOKEN_CACHE + ":" + userId, refreshToken, refreshTtl);
+                AuthConstants.TokenConstants.REFRESH_TOKEN_CACHE + ":" + userId,
+                SecurityFingerprint.sha256(refreshToken),
+                refreshTtl);
     }
 
     private void clearToken(String userId) {
@@ -405,14 +399,22 @@ public class AuthServiceImpl implements IAuthService {
     }
 
     private void addToBlacklist(String token, long ttlSeconds) {
+        addFingerprintToBlacklist(SecurityFingerprint.sha256(token), ttlSeconds);
+    }
+
+    private void addFingerprintToBlacklist(String fingerprint, long ttlSeconds) {
         redisTemplate.opsForValue().set(
-                AuthConstants.TokenConstants.BLACKLIST_CACHE + ":" + token, "1",
+                blacklistKey(fingerprint), "1",
                 Duration.ofSeconds(ttlSeconds));
     }
 
     private boolean isInBlacklist(String token) {
         return Boolean.TRUE.equals(
-                redisTemplate.hasKey(AuthConstants.TokenConstants.BLACKLIST_CACHE + ":" + token));
+                redisTemplate.hasKey(blacklistKey(SecurityFingerprint.sha256(token))));
+    }
+
+    private String blacklistKey(String fingerprint) {
+        return AuthConstants.TokenConstants.BLACKLIST_CACHE + ":" + fingerprint;
     }
 
     private String authUserKey(String userId) {
@@ -420,16 +422,18 @@ public class AuthServiceImpl implements IAuthService {
     }
 
     private void invalidateCurrentTokens(String userId) {
-        String oldAccessToken = redisTemplate.opsForValue()
+        String oldAccessTokenFingerprint = redisTemplate.opsForValue()
                 .get(AuthConstants.TokenConstants.TOKEN_CACHE + ":" + userId);
-        if (StringUtils.hasText(oldAccessToken)) {
-            addToBlacklist(oldAccessToken, jwtProperties.getAccessTokenExpirationSeconds());
+        if (StringUtils.hasText(oldAccessTokenFingerprint)) {
+            addFingerprintToBlacklist(
+                    oldAccessTokenFingerprint, jwtProperties.getAccessTokenExpirationSeconds());
         }
 
-        String oldRefreshToken = redisTemplate.opsForValue()
+        String oldRefreshTokenFingerprint = redisTemplate.opsForValue()
                 .get(AuthConstants.TokenConstants.REFRESH_TOKEN_CACHE + ":" + userId);
-        if (StringUtils.hasText(oldRefreshToken)) {
-            addToBlacklist(oldRefreshToken, jwtProperties.getRefreshTokenExpirationSeconds());
+        if (StringUtils.hasText(oldRefreshTokenFingerprint)) {
+            addFingerprintToBlacklist(
+                    oldRefreshTokenFingerprint, jwtProperties.getRefreshTokenExpirationSeconds());
         }
     }
 
@@ -455,8 +459,8 @@ public class AuthServiceImpl implements IAuthService {
                 user.avatar(),
                 user.userType(),
                 user.superAdmin(),
-                user.roleCodes(),
-                user.postCodes(),
+                user.superAdmin() ? null : user.roleCodes(),
+                user.superAdmin() ? null : user.postCodes(),
                 user.permissions(),
                 user.deptId(),
                 user.deptIds()

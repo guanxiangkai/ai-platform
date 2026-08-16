@@ -93,9 +93,10 @@ public class SseConnectionRecordServiceImpl
             record.setServerInstance(getServerInstance());
 
             repository.save(record);
-            log.debug("[SSE-Audit] 连接记录已创建: userId={}, connId={}", userId, connectionId);
+            log.debug("[SSE-Audit] 连接记录已创建: connId={}", connectionId);
         } catch (Exception e) {
-            log.error("[SSE-Audit] 记录连接失败: userId={}, connId={}", userId, connectionId, e);
+            log.error("[SSE-Audit] 记录连接失败: connId={}, exception={}",
+                    connectionId, e.getClass().getSimpleName());
         }
     }
 
@@ -121,7 +122,8 @@ public class SseConnectionRecordServiceImpl
                                 connectionId, disconnectReason, record.getDurationSeconds());
                     }, () -> log.warn("[SSE-Audit] 断开时未找到连接记录: connId={}", connectionId));
         } catch (Exception e) {
-            log.error("[SSE-Audit] 记录断开失败: connId={}", connectionId, e);
+            log.error("[SSE-Audit] 记录断开失败: connId={}, exception={}",
+                    connectionId, e.getClass().getSimpleName());
         }
     }
 

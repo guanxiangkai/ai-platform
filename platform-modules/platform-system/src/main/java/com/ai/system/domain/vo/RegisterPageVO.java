@@ -48,8 +48,8 @@ public class RegisterPageVO extends DataPageVO {
     @Schema(description = "注册部门ID")
     private String deptId;
 
-    @Schema(description = "匹配的外部目录主体ID")
-    private String directorySubjectId;
+    @Schema(description = "匹配的员工档案ID")
+    private String personnelId;
 
     @Schema(description = "注册开通状态")
     private RegisterState registrationState;

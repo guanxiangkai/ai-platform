@@ -1,9 +1,11 @@
 package com.ai.auth.service.impl;
 
-import com.ai.auth.constants.AuthModuleConstants;
 import com.ai.auth.properties.AuthProtectionProperties;
 import com.ai.auth.service.AuthProtectionService;
+import com.ai.auth.constants.AuthModuleConstants;
+import io.github.guanxiangkai.web.plus.core.crypto.SecurityFingerprint;
 import io.github.guanxiangkai.web.plus.core.exception.BaseException;
+import io.github.guanxiangkai.web.plus.core.net.ClientIpResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -11,11 +13,6 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Locale;
 
 /**
@@ -28,6 +25,7 @@ public class RedisAuthProtectionService implements AuthProtectionService {
 
     private final StringRedisTemplate redisTemplate;
     private final AuthProtectionProperties properties;
+    private final ClientIpResolver clientIpResolver;
 
     @Override
     public void assertLoginAllowed(String username, ServerHttpRequest request) {
@@ -92,11 +90,13 @@ public class RedisAuthProtectionService implements AuthProtectionService {
     }
 
     private String loginSubjectKey(String username, ServerHttpRequest request) {
-        return normalize(username) + ":" + clientIp(request);
+        return SecurityFingerprint.sha256(normalize(username) + "\n"
+                + clientIpResolver.resolve(request));
     }
 
     private String refreshSubjectKey(String refreshToken, ServerHttpRequest request) {
-        return tokenHash(refreshToken) + ":" + clientIp(request);
+        return SecurityFingerprint.sha256(refreshToken + "\n"
+                + clientIpResolver.resolve(request));
     }
 
     private String normalize(String value) {
@@ -106,39 +106,4 @@ public class RedisAuthProtectionService implements AuthProtectionService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private String clientIp(ServerHttpRequest request) {
-        for (String header : AuthModuleConstants.HeaderConstants.CLIENT_IP_HEADERS) {
-            String value = request.getHeaders().getFirst(header);
-            String ip = firstHeaderValue(value);
-            if (StringUtils.hasText(ip)) {
-                return ip;
-            }
-        }
-        InetSocketAddress remoteAddress = request.getRemoteAddress();
-        if (remoteAddress != null && remoteAddress.getAddress() != null) {
-            return remoteAddress.getAddress().getHostAddress();
-        }
-        return "unknown";
-    }
-
-    private String firstHeaderValue(String value) {
-        if (!StringUtils.hasText(value) || "unknown".equalsIgnoreCase(value)) {
-            return null;
-        }
-        if (value.startsWith("for=")) {
-            return value.substring(4).replace("\"", "");
-        }
-        int comma = value.indexOf(',');
-        return comma >= 0 ? value.substring(0, comma).trim() : value.trim();
-    }
-
-    private String tokenHash(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest((token == null ? "" : token).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 digest unavailable", e);
-        }
-    }
 }

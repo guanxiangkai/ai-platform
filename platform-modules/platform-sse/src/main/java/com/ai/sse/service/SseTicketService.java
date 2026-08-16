@@ -69,8 +69,8 @@ public class SseTicketService {
                 SseConstants.RedisKeyConstants.TICKET_PREFIX + ticket,
                 value.toString(),
                 sseProperties.ticketTtl());
-        log.debug("SSE 票据已创建: userId={}, bindContext={}, ttl={}",
-                userId, sseProperties.ticketBindContext(), sseProperties.ticketTtl());
+        log.debug("SSE 票据已创建: bindContext={}, ttl={}",
+                sseProperties.ticketBindContext(), sseProperties.ticketTtl());
         return ticket;
     }
 
@@ -103,16 +103,16 @@ public class SseTicketService {
             String currentUaHash = hashValue(userAgent);
 
             if (StringUtils.hasText(storedIpHash) && !storedIpHash.equals(currentIpHash)) {
-                log.warn("SSE 票据客户端地址不匹配: userId={}", userId);
+                log.warn("SSE 票据客户端地址不匹配");
                 return null;
             }
             if (StringUtils.hasText(storedUaHash) && !storedUaHash.equals(currentUaHash)) {
-                log.warn("SSE 票据客户端标识不匹配: userId={}", userId);
+                log.warn("SSE 票据客户端标识不匹配");
                 return null;
             }
         }
 
-        log.debug("SSE 票据验证通过: userId={}", userId);
+        log.debug("SSE 票据验证通过");
         return new TicketInfo(userId, tenantId);
     }
 

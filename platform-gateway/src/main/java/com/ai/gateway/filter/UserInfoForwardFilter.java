@@ -4,6 +4,7 @@ import cn.hutool.json.JSONUtil;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import io.github.guanxiangkai.web.plus.core.properties.TrustedForwardProperties;
 import io.github.guanxiangkai.web.plus.core.util.UserClaimsCodec;
+import com.ai.gateway.util.ReactiveRequestUtils;
 import com.ai.gateway.config.AiGatewayProperties;
 import com.ai.gateway.constant.FilterOrder;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +67,7 @@ public class UserInfoForwardFilter implements GlobalFilter, Ordered {
                     h.remove(props.getTenantIdHeader());
                     h.remove(props.getUserClaimsHeader());
                     h.remove(AuthConstants.HeaderConstants.USER_CLAIMS_ENCODING);
+                    h.remove(AuthConstants.HeaderConstants.VERIFIED_CLIENT_IP);
                     h.remove(trustedForwardProperties.getHeaderName());
                 })
                 .build();
@@ -90,6 +92,8 @@ public class UserInfoForwardFilter implements GlobalFilter, Ordered {
 
                     String claimsJson = JSONUtil.toJsonStr(safeClaims);
                     String encodedClaims = UserClaimsCodec.encode(claimsJson);
+                    String clientIp = ReactiveRequestUtils.getClientIp(
+                            exchange.getRequest(), props.getTrustedProxyIps());
 
                     ServerHttpRequest mutated = cleanedExchange.getRequest().mutate()
                             .headers(h -> {
@@ -101,6 +105,7 @@ public class UserInfoForwardFilter implements GlobalFilter, Ordered {
                             .header(props.getTenantIdHeader(), tenantId)
                             .header(props.getUserClaimsHeader(), encodedClaims)
                             .header(AuthConstants.HeaderConstants.USER_CLAIMS_ENCODING, UserClaimsCodec.BASE64URL_ENCODING)
+                            .header(AuthConstants.HeaderConstants.VERIFIED_CLIENT_IP, clientIp)
                             .header(trustedForwardProperties.getHeaderName(), trustedForwardProperties.getToken())
                             .build();
 
@@ -145,19 +150,22 @@ public class UserInfoForwardFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isAgentServicePath(String path) {
-        String candidate = stripTenantPrefix(path);
-        return candidate.equals("/agent") || candidate.startsWith("/agent/")
-                || candidate.equals("/api/agent") || candidate.startsWith("/api/agent/");
+        return path.equals("/agent") || path.startsWith("/agent/")
+                || path.equals("/api/agent") || path.startsWith("/api/agent/")
+                || isTenantServicePath(path, "agent");
     }
 
-    private String stripTenantPrefix(String path) {
+    private boolean isTenantServicePath(String path, String service) {
         String normalized = path.startsWith("/") ? path.substring(1) : path;
         int separator = normalized.indexOf('/');
-        String prefix = separator < 0 ? normalized : normalized.substring(0, separator);
-        if (!props.getTenantPathIds().containsKey(prefix)) {
-            return path;
+        if (separator < 0 || !props.getTenantPathIds().containsKey(normalized.substring(0, separator))) {
+            return false;
         }
-        return separator < 0 ? "/" : normalized.substring(separator);
+        String remainder = normalized.substring(separator + 1);
+        if (remainder.startsWith("api/")) {
+            remainder = remainder.substring("api/".length());
+        }
+        return remainder.equals(service) || remainder.startsWith(service + "/");
     }
 
     private Mono<Void> forwardAnonymousTenantContext(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -166,13 +174,14 @@ public class UserInfoForwardFilter implements GlobalFilter, Ordered {
         int separator = normalized.indexOf('/');
         String prefix = separator < 0 ? normalized : normalized.substring(0, separator);
         String tenantId = props.getTenantPathIds().get(prefix);
-        if (!org.springframework.util.StringUtils.hasText(tenantId)) {
-            return chain.filter(exchange);
+        ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate()
+                .header(AuthConstants.HeaderConstants.VERIFIED_CLIENT_IP,
+                        ReactiveRequestUtils.getClientIp(exchange.getRequest(), props.getTrustedProxyIps()))
+                .header(trustedForwardProperties.getHeaderName(), trustedForwardProperties.getToken());
+        if (org.springframework.util.StringUtils.hasText(tenantId)) {
+            requestBuilder.header(props.getTenantIdHeader(), tenantId);
         }
-        ServerHttpRequest request = exchange.getRequest().mutate()
-                .header(props.getTenantIdHeader(), tenantId)
-                .header(trustedForwardProperties.getHeaderName(), trustedForwardProperties.getToken())
-                .build();
+        ServerHttpRequest request = requestBuilder.build();
         return chain.filter(exchange.mutate().request(request).build());
     }
 

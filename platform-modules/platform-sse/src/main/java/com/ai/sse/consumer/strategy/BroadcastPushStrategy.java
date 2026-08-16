@@ -1,6 +1,6 @@
 package com.ai.sse.consumer.strategy;
 
-import com.ai.api.sse.dto.SseNotification;
+import com.ai.sse.model.mq.SseNotification;
 import com.ai.sse.service.ISseService;
 import org.springframework.stereotype.Component;
 

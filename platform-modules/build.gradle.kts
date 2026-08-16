@@ -1,7 +1,6 @@
 // ===== 预解析 Version Catalog 引用（subprojects {} 内部无法直接访问 libs）=====
-var mapstructPlus: Provider<MinimalExternalModuleDependency> = libs.mapstruct.plus.processor
-var lombokMapstructBinding: Provider<MinimalExternalModuleDependency> = libs.lombok.mapstruct.binding
-var cloudService: Provider<ExternalModuleDependencyBundle> = libs.bundles.cloud.service
+val mapstructProcessors: Provider<ExternalModuleDependencyBundle> = libs.bundles.mapstruct.processors
+val cloudService: Provider<ExternalModuleDependencyBundle> = libs.bundles.cloud.service
 val springboot: Provider<PluginDependency> = libs.plugins.springboot
 
 subprojects {
@@ -23,11 +22,7 @@ subprojects {
         implementation(cloudService)
 
         // MapStruct-Plus 注解处理器（必须显式声明，注解处理器不可传递，否则 @AutoMapper 不生成转换器代码）
-        annotationProcessor(mapstructPlus)
-        // Lombok-MapStruct 绑定：确保 Lombok AST 变换在 MapStruct 代码生成之前完成
-        // io.freefair.lombok 插件仅在检测到 org.mapstruct:mapstruct-processor 直接依赖时自动添加；
-        // 使用 mapstruct-plus-processor 时需手动声明。
-        annotationProcessor(lombokMapstructBinding)
+        annotationProcessor(mapstructProcessors)
 
     }
 }

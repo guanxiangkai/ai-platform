@@ -71,7 +71,7 @@ public class DefaultSseOperations implements SseOperations {
         int userConnectionCount;
         synchronized (connections) {
             if (getTotalConnectionCount() >= maxConnections) {
-                log.warn("SSE 全局连接数已达上限: max={}, userId={}", maxConnections, userId);
+                log.warn("SSE 全局连接数已达上限: max={}", maxConnections);
                 return Flux.just(ServerSentEvent.<String>builder()
                         .data("{\"error\":\"max_connections_reached\"}")
                         .build());
@@ -80,8 +80,8 @@ public class DefaultSseOperations implements SseOperations {
                     _ -> new CopyOnWriteArrayList<>());
             if (userConns.size() >= maxConnectionsPerUser) {
                 SseConnection oldest = userConns.getFirst();
-                log.info("SSE 用户连接数达上限，踢掉最早连接: userId={}, connId={}, max={}",
-                        userId, oldest.connectionId(), maxConnectionsPerUser);
+                log.info("SSE 用户连接数达上限，踢掉最早连接: connId={}, max={}",
+                        oldest.connectionId(), maxConnectionsPerUser);
                 doDisconnectOne(userId, oldest, SseConstants.ConnectionStatus.DISCONNECTED);
             }
             sink = Sinks.many().unicast().onBackpressureBuffer();
@@ -96,8 +96,8 @@ public class DefaultSseOperations implements SseOperations {
 
         // 发布连接事件
         eventPublisher.publishEvent(new SseConnectEvent(this, connection));
-        log.info("SSE 连接建立: userId={}, connId={}, tenantId={}, userConns={}, totalOnline={}",
-                userId, connection.connectionId(), tenantId, userConnectionCount, getTotalConnectionCount());
+        log.info("SSE 连接建立: connId={}, userConns={}, totalOnline={}",
+                connection.connectionId(), userConnectionCount, getTotalConnectionCount());
 
         return sink.asFlux()
                 .map(data -> ServerSentEvent.<String>builder().data(data).build())
@@ -113,7 +113,7 @@ public class DefaultSseOperations implements SseOperations {
             closeSink(conn);
             eventPublisher.publishEvent(new SseDisconnectEvent(this, conn.withStatus(SseConstants.ConnectionStatus.DISCONNECTED)));
         }
-        log.info("SSE 用户所有连接断开: userId={}, count={}", userId, userConns.size());
+        log.info("SSE 用户所有连接断开: count={}", userConns.size());
     }
 
     @Override
@@ -152,7 +152,7 @@ public class DefaultSseOperations implements SseOperations {
     public void sendToUser(String userId, SseMessage<?> message) {
         CopyOnWriteArrayList<SseConnection> userConns = connections.get(userId);
         if (userConns == null || userConns.isEmpty()) {
-            log.debug("用户不在线: userId={}", userId);
+            log.debug("目标用户不在线");
             return;
         }
 
@@ -167,7 +167,7 @@ public class DefaultSseOperations implements SseOperations {
                 }
                 Sinks.EmitResult result = conn.sink().tryEmitNext(json);
                 if (result.isFailure()) {
-                    log.warn("发送消息失败: userId={}, connId={}, result={}", userId, conn.connectionId(), result);
+                    log.warn("发送消息失败: connId={}, result={}", conn.connectionId(), result);
                     totalMessagesFailed.incrementAndGet();
                     failedConns.add(conn);
                 } else {
@@ -189,9 +189,9 @@ public class DefaultSseOperations implements SseOperations {
                 totalMessagesSent.incrementAndGet();
                 eventPublisher.publishEvent(new SseMessageSentEvent(this, message));
             }
-            log.debug("发送消息: userId={}, type={}, activeConns={}", userId, message.type(), successCount);
+            log.debug("发送消息: type={}, activeConns={}", message.type(), successCount);
         } catch (Exception e) {
-            log.error("发送消息异常: userId={}", userId, e);
+            log.error("发送消息异常: exception={}", e.getClass().getSimpleName());
             totalMessagesFailed.incrementAndGet();
         }
     }
@@ -216,7 +216,7 @@ public class DefaultSseOperations implements SseOperations {
                 .filter(e -> e.getValue().stream().anyMatch(c -> tenantId.equals(c.tenantId())))
                 .map(Map.Entry::getKey)
                 .toList();
-        log.info("租户广播: tenantId={}, userCount={}", tenantId, tenantUsers.size());
+        log.info("租户广播: userCount={}", tenantUsers.size());
         sendToUsers(tenantUsers, message);
     }
 
@@ -233,7 +233,7 @@ public class DefaultSseOperations implements SseOperations {
                 .sendTime(message.sendTime())
                 .tenantId(message.tenantId())
                 .build();
-        log.info("群组消息: groupId={}, memberCount={}", groupId, userIds.size());
+        log.info("群组消息: memberCount={}", userIds.size());
         sendToUsers(userIds, groupMessage);
     }
 
@@ -361,8 +361,8 @@ public class DefaultSseOperations implements SseOperations {
 
         closeSink(connection);
         eventPublisher.publishEvent(new SseDisconnectEvent(this, connection.withStatus(status)));
-        log.debug("SSE 单连接断开: userId={}, connId={}, status={}, remainingConns={}",
-                userId, connection.connectionId(), status, remainingConnections);
+        log.debug("SSE 单连接断开: connId={}, status={}, remainingConns={}",
+                connection.connectionId(), status, remainingConnections);
     }
 
     private void closeSink(SseConnection connection) {
@@ -370,7 +370,8 @@ public class DefaultSseOperations implements SseOperations {
             try {
                 connection.sink().tryEmitComplete();
             } catch (Exception e) {
-                log.warn("关闭 SSE Sink 异常: userId={}, connId={}", connection.userId(), connection.connectionId(), e);
+                log.warn("关闭 SSE Sink 异常: connId={}, exception={}",
+                        connection.connectionId(), e.getClass().getSimpleName());
             }
         }
     }
@@ -381,7 +382,8 @@ public class DefaultSseOperations implements SseOperations {
             String json = objectMapper.writeValueAsString(connectMessage);
             sink.tryEmitNext(json);
         } catch (Exception e) {
-            log.error("发送连接成功消息失败: userId={}, connId={}", userId, connectionId, e);
+            log.error("发送连接成功消息失败: connId={}, exception={}",
+                    connectionId, e.getClass().getSimpleName());
         }
     }
 

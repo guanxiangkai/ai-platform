@@ -236,9 +236,9 @@ public class MessageServiceImpl extends BaseServiceImpl<MessagePageDTO, MessageP
             Long count = repository.countByReceiverIdAndIsReadAndDeletedFalse(userId, false);
             Map<String, Object> notification = buildUserNotification(userId, SystemConstants.SseConstants.TYPE_UNREAD_COUNT, count);
             messageProducer.send(SystemConstants.SseConstants.TOPIC_NOTIFICATION, notification);
-            log.debug("[SSE] 推送未读消息数量: userId={}, count={}", userId, count);
+            log.debug("[SSE] 推送未读消息数量: count={}", count);
         } catch (Exception e) {
-            log.warn("[SSE] 推送未读消息数量失败: userId={}, error={}", userId, e.getMessage());
+            log.warn("[SSE] 推送未读消息数量失败: exception={}", e.getClass().getSimpleName());
         }
     }
 
@@ -252,9 +252,9 @@ public class MessageServiceImpl extends BaseServiceImpl<MessagePageDTO, MessageP
             List<MessageVO> notices = converter.convert(getNoticesByUserId(userId), MessageVO.class);
             Map<String, Object> notification = buildUserNotification(userId, SystemConstants.SseConstants.TYPE_NOTICES, notices);
             messageProducer.send(SystemConstants.SseConstants.TOPIC_NOTIFICATION, notification);
-            log.debug("[SSE] 推送公告消息: userId={}, count={}", userId, notices.size());
+            log.debug("[SSE] 推送公告消息: count={}", notices.size());
         } catch (Exception e) {
-            log.warn("[SSE] 推送公告消息失败: userId={}, error={}", userId, e.getMessage());
+            log.warn("[SSE] 推送公告消息失败: exception={}", e.getClass().getSimpleName());
         }
     }
 

@@ -1,0 +1,42 @@
+# Data ID: platform-agent.yml
+# Group 由部署环境指定。
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+      database: ${PLATFORM_REDIS_DATABASE}
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          url: ${db.url}
+          username: ${db.username}
+          password: ${db.password}
+          driver-class-name: ${db.driver-class-name}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+jpa-plus:
+  enabled: true
+platform:
+  agent:
+    speech-to-text-enabled: ${AGENT_ASR_ENABLED:true}
+    speech-to-text-url: ${AGENT_ASR_URL:}
+    speech-to-text-api-key: ${AGENT_ASR_API_KEY:}
+    speech-to-text-timeout: ${AGENT_ASR_TIMEOUT:60s}
+    speech-to-text-max-upload-size: ${AGENT_ASR_MAX_UPLOAD_SIZE:10MB}
+    invocation:
+      execution-lease: ${AGENT_EXECUTION_LEASE:15m}
+      max-history-messages: ${AGENT_MAX_HISTORY_MESSAGES:20}
+      max-history-characters: ${AGENT_MAX_HISTORY_CHARACTERS:24000}
+      max-variable-count: ${AGENT_MAX_VARIABLE_COUNT:32}
+      max-variable-name-length: ${AGENT_MAX_VARIABLE_NAME_LENGTH:64}
+      max-variable-depth: ${AGENT_MAX_VARIABLE_DEPTH:4}
+      max-variable-collection-size: ${AGENT_MAX_VARIABLE_COLLECTION_SIZE:64}
+      max-variable-text-length: ${AGENT_MAX_VARIABLE_TEXT_LENGTH:4000}
+      max-variable-total-size: ${AGENT_MAX_VARIABLE_TOTAL_SIZE:16000}
+      skill-selection-limit: ${AGENT_SKILL_SELECTION_LIMIT:200}

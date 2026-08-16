@@ -124,7 +124,8 @@ public class DictServiceImpl extends BaseServiceImpl<DictPageDTO, DictPageVO, Di
                     cacheDictProvider.getLabel(dictCode, "");
                     log.debug("字典缓存已刷新并预热: dictCode={}", dictCode);
                 } catch (Exception e) {
-                    log.error("刷新字典缓存失败: dictCode={}", dictCode, e);
+                    log.error("刷新字典缓存失败: dictCode={}, exception={}",
+                            dictCode, e.getClass().getSimpleName());
                 }
             }
             refreshedCount += page.getNumberOfElements();
@@ -156,7 +157,8 @@ public class DictServiceImpl extends BaseServiceImpl<DictPageDTO, DictPageVO, Di
                 dictRefresher.invalidate(dictType);
                 dictRefresher.refresh();
             } catch (Exception e) {
-                log.warn("[DictServiceImpl] Web Plus 字典缓存刷新失败: dictType={}", dictType, e);
+                log.warn("[DictServiceImpl] Web Plus 字典缓存刷新失败: dictType={}, exception={}",
+                        dictType, e.getClass().getSimpleName());
             }
         }
         if (dictType != null) {

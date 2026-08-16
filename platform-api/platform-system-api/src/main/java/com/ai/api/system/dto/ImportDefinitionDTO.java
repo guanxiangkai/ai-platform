@@ -3,7 +3,7 @@ package com.ai.api.system.dto;
 import java.io.Serializable;
 import java.util.List;
 
-/** Complete enabled import definition exposed by ai-system. */
+/** platform-system 对外提供的完整启用导入定义。 */
 public record ImportDefinitionDTO(
         String code,
         String name,

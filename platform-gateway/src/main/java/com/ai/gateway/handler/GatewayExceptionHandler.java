@@ -10,6 +10,9 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebExceptionHandler;
 import reactor.core.publisher.Mono;
 
+import java.net.ConnectException;
+import java.util.concurrent.TimeoutException;
+
 /**
  * 网关全局异常处理器
  * <p>
@@ -36,23 +39,49 @@ public class GatewayExceptionHandler implements WebExceptionHandler {
 
         if (ex instanceof ResponseStatusException rse) {
             code = rse.getStatusCode().value();
-            message = switch (code) {
-                case 404 -> "服务路由未找到";
-                case 503 -> "服务暂不可用，请稍后重试";
-                case 504 -> "服务响应超时";
-                default -> rse.getReason() != null ? rse.getReason() : rse.getStatusCode().toString();
-            };
-        } else if (ex.getMessage() != null && ex.getMessage().contains("Connection refused")) {
+            message = publicMessage(code);
+        } else if (hasCause(ex, ConnectException.class)) {
             code = 503;
-            message = "目标服务不可达，请检查服务是否已启动";
+            message = "服务暂不可用，请稍后重试";
+        } else if (hasCause(ex, TimeoutException.class)) {
+            code = 504;
+            message = "服务响应超时";
         } else {
             code = 500;
             message = "网关内部错误";
         }
 
-        log.error("[Gateway] 请求 [{}] 异常: {} - {}",
-                exchange.getRequest().getURI().getPath(), code, message, ex);
+        log.error("[Gateway] 请求处理异常: path={}, status={}, exception={}",
+                exchange.getRequest().getURI().getPath(), code, ex.getClass().getSimpleName());
 
         return ReactiveResponseUtils.writeError(exchange, code, message);
+    }
+
+    private static String publicMessage(int code) {
+        return switch (code) {
+            case 400 -> "请求无效";
+            case 401 -> "认证失败";
+            case 403 -> "无权访问";
+            case 404 -> "服务路由未找到";
+            case 405 -> "请求方法不受支持";
+            case 408 -> "请求超时";
+            case 413 -> "请求内容过大";
+            case 415 -> "请求内容类型不受支持";
+            case 429 -> "请求过于频繁，请稍后重试";
+            case 502, 503 -> "服务暂不可用，请稍后重试";
+            case 504 -> "服务响应超时";
+            default -> code >= 400 && code < 500 ? "请求处理失败" : "网关内部错误";
+        };
+    }
+
+    private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        Throwable current = error;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

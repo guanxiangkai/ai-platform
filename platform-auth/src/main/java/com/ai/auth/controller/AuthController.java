@@ -2,13 +2,13 @@ package com.ai.auth.controller;
 
 import io.github.guanxiangkai.web.plus.log.annotation.LoginLog;
 import com.ai.auth.domain.dto.LoginRequest;
+import com.ai.auth.domain.dto.RefreshTokenRequest;
 import com.ai.auth.domain.vo.LoginResponse;
 import com.ai.auth.log.AuthLoginLogRecord;
 import com.ai.auth.service.IAuthService;
 import io.github.guanxiangkai.web.plus.core.exception.BaseException;
 import io.github.guanxiangkai.web.plus.core.model.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -65,11 +65,13 @@ public class AuthController {
      * 刷新Token
      */
     @Operation(summary = "刷新Token", description = "使用刷新令牌获取新的访问令牌")
-    @LoginLog(entity = AuthLoginLogRecord.class, action = "REFRESH_TOKEN")
     @PostMapping("/refresh")
     public Mono<ApiResponse<LoginResponse>> refreshToken(
-            @Parameter(description = "刷新令牌") @RequestParam String refreshToken,
+            @Valid @RequestBody RefreshTokenRequest request,
             ServerWebExchange exchange) {
-        return authService.refreshToken(refreshToken, exchange).map(ApiResponse::ok);
+        return authService.refreshToken(request.refreshToken(), exchange)
+                .map(ApiResponse::ok)
+                .onErrorResume(BaseException.BusinessException.class,
+                        error -> Mono.just(ApiResponse.fail(error.getCode(), error.getMessage())));
     }
 }

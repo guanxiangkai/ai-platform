@@ -22,9 +22,6 @@ public interface UserRepository extends BaseRepository<UserPageVO, UserVO, User>
     /** 批量查询当前租户内未删除的用户。 */
     List<User> findAllByIdInAndDeletedFalse(Collection<String> ids);
 
-    /** 批量查询当前租户内未删除的用户。 */
-    List<User> findAllByUsernameInAndDeletedFalse(Collection<String> usernames);
-
     /**
      * 根据用户名查询用户（过滤逻辑删除）
      */

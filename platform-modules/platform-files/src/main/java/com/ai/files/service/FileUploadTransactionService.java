@@ -189,7 +189,7 @@ class FileUploadTransactionService {
         }
         upload.setUploadState(FileUploadState.CLEANUP_PENDING);
         upload.setNextAttemptAt(Instant.now());
-        upload.setLastError(limit(message(error)));
+        upload.setLastError(errorSummary(error));
         uploads.save(upload);
     }
 
@@ -251,7 +251,7 @@ class FileUploadTransactionService {
         Instant now = Instant.now();
         upload.setLeaseExpiresAt(now);
         upload.setNextAttemptAt(now.plus(properties.resolvedReconcileRetryDelay()));
-        upload.setLastError(limit(message(error)));
+        upload.setLastError(errorSummary(error));
         uploads.save(upload);
     }
 
@@ -395,8 +395,11 @@ class FileUploadTransactionService {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
-    private String message(Throwable error) {
-        return StringUtils.hasText(error.getMessage()) ? error.getMessage() : error.getClass().getSimpleName();
+    private String errorSummary(Throwable error) {
+        if (error instanceof BizException && StringUtils.hasText(error.getMessage())) {
+            return limit(error.getMessage());
+        }
+        return limit(error.getClass().getSimpleName());
     }
 
     private String limit(String value) {
@@ -420,9 +423,21 @@ class FileUploadTransactionService {
             String businessId,
             String editToken
     ) {
+        @Override
+        public String toString() {
+            return "UploadCommand[identity=<redacted>, file=<redacted>, contentType=" + contentType
+                    + ", sizeBytes=" + sizeBytes
+                    + ", businessType=" + businessType
+                    + ", editToken=<redacted>]";
+        }
     }
 
     record Reservation(String uploadId, String tenantId, String executionToken, String objectKey) {
+        @Override
+        public String toString() {
+            return "Reservation[uploadId=" + uploadId
+                    + ", tenantId=<redacted>, executionToken=<redacted>, objectKey=<redacted>]";
+        }
     }
 
     record Recovery(Reservation reservation, FileUploadState state) {

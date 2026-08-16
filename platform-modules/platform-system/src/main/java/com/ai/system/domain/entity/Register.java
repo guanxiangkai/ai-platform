@@ -18,9 +18,9 @@ import java.time.LocalDateTime;
  * <p>
  * 用户自助注册后生成注册记录：
  * <ul>
- *   <li>注册时：系统根据真实姓名拼音首字母自动生成用户名，并从租户目录匹配主体。</li>
- *   <li>匹配失败（未找到主体或主体已有账户）则注册被拒绝。</li>
- *   <li>审核通过时：仅创建用户账户，并回写 userId，同时通知目录服务绑定账户。</li>
+ *   <li>注册时：系统根据真实姓名拼音首字母自动生成用户名，并从业务服务匹配员工档案。</li>
+ *   <li>匹配失败（未找到员工或员工已有账户）则注册被拒绝。</li>
+ *   <li>审核通过时：仅创建用户账户，并回写 userId，同时通知业务服务绑定员工账户。</li>
  * </ul>
  * </p>
  *
@@ -71,10 +71,10 @@ public class Register extends SortableTenantEntity {
     private String deptId;
 
     /**
-     * 注册时匹配到的外部目录主体 ID。
+     * 注册时匹配到的员工档案ID（对应 business 模块 Personnel 表）
      */
-    @Column(name = "directory_subject_id", nullable = false, length = 64, comment = "外部目录主体ID")
-    private String directorySubjectId;
+    @Column(name = "personnel_id", nullable = false, length = 64, comment = "匹配员工档案ID")
+    private String personnelId;
 
     /** 注册开通状态；仅 ACTIVE 的账户可登录。 */
     @Enumerated(EnumType.STRING)

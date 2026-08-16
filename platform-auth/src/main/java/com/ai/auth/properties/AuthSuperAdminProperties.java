@@ -41,4 +41,14 @@ public record AuthSuperAdminProperties(
     public boolean matchesUsername(String candidate) {
         return configured() && StringUtils.hasText(candidate) && username.equals(candidate.trim());
     }
+
+    /**
+     * 返回不包含超级管理员账号和密码哈希的诊断摘要。
+     *
+     * @return 已脱敏的超级管理员配置摘要
+     */
+    @Override
+    public String toString() {
+        return "AuthSuperAdminProperties[enabled=" + enabled + ", credentials=<redacted>]";
+    }
 }

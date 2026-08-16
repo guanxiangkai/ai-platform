@@ -1,0 +1,44 @@
+# Data ID: platform-sse.yml
+# Group 由部署环境指定。
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  data:
+    redis:
+      host: ${redis.host}
+      port: ${redis.port}
+      password: ${redis.password}
+      database: ${redis.database}
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          url: ${db.url}
+          username: ${db.username}
+          password: ${db.password}
+          driver-class-name: ${db.driver-class-name}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+jpa-plus:
+  enabled: true
+
+ai:
+  sse:
+    timeout: ${SSE_TIMEOUT_MS:1800000}
+    heartbeat-interval: ${SSE_HEARTBEAT_INTERVAL_MS:30000}
+    max-connections: ${SSE_MAX_CONNECTIONS:10000}
+    max-connections-per-user: ${SSE_MAX_CONNECTIONS_PER_USER:3}
+    cleanup-interval: ${SSE_CLEANUP_INTERVAL_MS:60000}
+    ticket-rate-limit: ${SSE_TICKET_RATE_LIMIT:5}
+    ticket-rate-window: ${SSE_TICKET_RATE_WINDOW_MS:60000}
+    ticket-bind-context: ${SSE_TICKET_BIND_CONTEXT:true}
+    enable-pubsub: ${SSE_ENABLE_PUBSUB:true}
+    pubsub-channel: ${SSE_PUBSUB_CHANNEL:sse:push}
+    ticket-ttl: ${SSE_TICKET_TTL:30s}
+    push-preference-query-timeout: ${SSE_PUSH_PREFERENCE_QUERY_TIMEOUT:2s}
+    push-preference-failure-policy: ${SSE_PUSH_PREFERENCE_FAILURE_POLICY:FAIL_CLOSED}
+    history-cleanup-batch-size: ${SSE_HISTORY_CLEANUP_BATCH_SIZE:500}

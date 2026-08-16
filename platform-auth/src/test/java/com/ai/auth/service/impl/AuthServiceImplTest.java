@@ -6,6 +6,7 @@ import com.ai.auth.properties.AuthSuperAdminProperties;
 import com.ai.auth.properties.JwtProperties;
 import com.ai.auth.service.AuthProtectionService;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
+import io.github.guanxiangkai.web.plus.core.crypto.SecurityFingerprint;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.HashOperations;
@@ -16,6 +17,7 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AuthServiceImplTest {
@@ -69,8 +72,16 @@ class AuthServiceImplTest {
         assertThat(response.userType()).isEqualTo("SUPER_ADMIN");
         assertThat(response.superAdmin()).isTrue();
         assertThat(response.permissions()).containsExactly("*");
-        assertThat(response.roleCodes()).isEmpty();
-        assertThat(response.postCodes()).isEmpty();
+        assertThat(response.roleCodes()).isNull();
+        assertThat(response.postCodes()).isNull();
+        verify(valueOperations).set(
+                eq(AuthConstants.TokenConstants.TOKEN_CACHE + ":platform-super-admin"),
+                eq(SecurityFingerprint.sha256("access-token")),
+                any(Duration.class));
+        verify(valueOperations).set(
+                eq(AuthConstants.TokenConstants.REFRESH_TOKEN_CACHE + ":platform-super-admin"),
+                eq(SecurityFingerprint.sha256("refresh-token")),
+                any(Duration.class));
     }
 
     @Test
@@ -122,7 +133,7 @@ class AuthServiceImplTest {
         HashOperations<String, Object, Object> hashOperations = mock(HashOperations.class);
         AuthProtectionService authProtectionService = mock(AuthProtectionService.class);
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/alpha/auth/login")
+                MockServerHttpRequest.post("/product-a/auth/login")
                         .header(AuthConstants.HeaderConstants.TENANT_ID, "tenant-1")
                         .build()
         );
@@ -133,12 +144,12 @@ class AuthServiceImplTest {
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_PASSWORD_HASH, "{bcrypt}password");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_ENABLED, "true");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_TOKEN_VERSION, "1");
-        authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_NICKNAME, "租户用户");
+        authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_NICKNAME, "示例用户");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_USER_TYPE, "ADMIN");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_SUPER_ADMIN, "true");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_TENANT_ID, "tenant-1");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_DEPT_ID, "dept-1");
-        authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_ROLE_CODES, "[\"member\"]");
+        authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_ROLE_CODES, "[\"operator\"]");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_POST_CODES, "[\"worker\"]");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_PERMISSIONS, "[\"home:view\"]");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_DEPT_IDS, "[\"dept-1\"]");
@@ -148,9 +159,7 @@ class AuthServiceImplTest {
         when(jwtService.generateRefreshToken(eq("2"), any())).thenReturn("refresh-token");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
-        when(valueOperations.get(
-                AuthConstants.UserAuthCacheConstants.USERNAME_INDEX_PREFIX + "tenant-1:tenant-user"))
-                .thenReturn("2");
+        when(valueOperations.get(AuthConstants.UserAuthCacheConstants.USERNAME_INDEX_PREFIX + "tenant-user")).thenReturn("2");
         when(hashOperations.entries(AuthConstants.UserAuthCacheConstants.USER_AUTH_CACHE_PREFIX + "2")).thenReturn(authHash);
         when(hashOperations.increment(
                 AuthConstants.UserAuthCacheConstants.USER_AUTH_CACHE_PREFIX + "2",
@@ -176,12 +185,12 @@ class AuthServiceImplTest {
         assertThat(claimsCaptor.getValue()).containsEntry("superAdmin", false);
         assertThat(response).isNotNull();
         assertThat(response.superAdmin()).isFalse();
-        assertThat(response.roleCodes()).containsExactly("member");
+        assertThat(response.roleCodes()).containsExactly("operator");
         assertThat(response.postCodes()).containsExactly("worker");
     }
 
     @Test
-    void loginShouldRejectUnrelatedCredentialAsPlatformSuperAdminCredential() {
+    void loginShouldRejectNacosCredentialAsPlatformSuperAdminCredential() {
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         RsaJwtServiceImpl jwtService = mock(RsaJwtServiceImpl.class);
         JwtProperties jwtProperties = mock(JwtProperties.class);
@@ -189,7 +198,7 @@ class AuthServiceImplTest {
         AuthProtectionService authProtectionService = mock(AuthProtectionService.class);
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login").build());
         String passwordHash = validBcryptHash();
-        when(passwordEncoder.matches("unrelated-password", passwordHash)).thenReturn(false);
+        when(passwordEncoder.matches("nacos-password", passwordHash)).thenReturn(false);
 
         AuthServiceImpl authService = new AuthServiceImpl(
                 passwordEncoder,
@@ -201,7 +210,7 @@ class AuthServiceImplTest {
         );
 
         assertThatThrownBy(() -> authService.login(
-                new LoginRequest("platform-admin", "unrelated-password", null, null), exchange).block())
+                new LoginRequest("platform-admin", "nacos-password", null, null), exchange).block())
                 .hasMessageContaining("用户名或密码错误");
     }
 

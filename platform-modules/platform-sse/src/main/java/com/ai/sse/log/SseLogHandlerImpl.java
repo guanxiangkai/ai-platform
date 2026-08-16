@@ -32,7 +32,7 @@ public class SseLogHandlerImpl implements SseLogHandler {
         }
         entity.setOperationType(SseOperationType.PUSH);
         sseLogService.createEntity(entity);
-        log.debug("[SseLogHandler] SSE操作日志保存成功: type={}, target={}, user={}, cost={}ms",
-                entity.getMessageType(), entity.getTargetType(), entity.getUsername(), entity.getCostMs());
+        log.debug("[SseLogHandler] SSE操作日志保存成功: type={}, target={}, cost={}ms",
+                entity.getMessageType(), entity.getTargetType(), entity.getCostMs());
     }
 }

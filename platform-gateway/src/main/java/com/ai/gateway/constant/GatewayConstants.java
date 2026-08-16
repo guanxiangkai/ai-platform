@@ -1,7 +1,5 @@
 package com.ai.gateway.constant;
 
-import java.util.List;
-
 /**
  * Gateway 模块常量
  */
@@ -17,15 +15,6 @@ public final class GatewayConstants {
     public static final class HeaderConstants {
 
         public static final String TRACE_ID = "X-Trace-Id";
-        public static final List<String> CLIENT_IP_HEADERS = List.of(
-                "X-Forwarded-For",
-                "X-Real-IP",
-                "Proxy-Client-IP",
-                "WL-Proxy-Client-IP",
-                "HTTP_X_FORWARDED_FOR",
-                "HTTP_CLIENT_IP"
-        );
-
         private HeaderConstants() {
         }
     }

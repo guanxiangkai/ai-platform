@@ -29,8 +29,9 @@ import com.ai.system.repository.UserRepository;
 import com.ai.system.repository.UserRoleRepository;
 import com.ai.system.repository.RegistrationOutboxRepository;
 import com.ai.system.constants.SystemConstants;
-import com.ai.system.integration.DirectoryMatchResult;
-import com.ai.system.integration.TenantDirectoryClient;
+import com.ai.system.integration.TenantWorkforceClient;
+import com.ai.system.integration.WorkforceMatchResult;
+import com.ai.system.integration.WorkforcePosition;
 import com.ai.system.security.AuthUserCacheService;
 import com.ai.system.service.IRegisterService;
 import com.ai.system.service.RegistrationSubmissionTransactionService;
@@ -53,7 +54,7 @@ import java.util.Optional;
  * <p>注册流程：
  * <ol>
  *   <li>用户只需填写真实姓名、密码、部门，其余选填</li>
- *   <li>注册时立即调用租户目录匹配外部主体（姓名→手机→邮箱）</li>
+ *   <li>注册时立即调用业务服务匹配员工档案（姓名→手机→邮箱）</li>
  *   <li>匹配失败（未找到 / 已有账户）→ 注册拒绝</li>
  *   <li>根据真实姓名拼音首字母自动生成用户名，重复时追加随机后缀</li>
  *   <li>保存注册记录（PENDING），返回生成的用户名让用户记下来</li>
@@ -61,7 +62,7 @@ import java.util.Optional;
  * 审核流程：
  * <ol>
  *   <li>审核通过：仅创建 User 账户，回填 userId</li>
- *   <li>通知目录服务将 User 绑定到外部主体</li>
+ *   <li>通知业务服务将 User 绑定到员工档案（hasUserAccount=true, userId=...）</li>
  *   <li>同时为 User 绑定注册时选择的部门</li>
  *   <li>审核拒绝：仅更新状态</li>
  * </ol>
@@ -85,7 +86,7 @@ public class RegisterServiceImpl
     private final RoleRepository roleRepository;
     private final DeptRepository deptRepository;
     private final PasswordEncoder passwordEncoder;
-    private final TenantDirectoryClient directoryClient;
+    private final TenantWorkforceClient workforceClient;
     private final AuthUserCacheService authUserCacheService;
     private final TenantIdProvider tenantIdProvider;
     private final RegistrationOutboxRepository registrationOutboxRepository;
@@ -124,25 +125,25 @@ public class RegisterServiceImpl
             }
         }
 
-        // 4. 调用租户目录匹配外部主体（注册时立即匹配，匹配失败则拒绝注册）
-        DirectoryMatchResult matchResult;
+        // 4. 调用业务服务匹配员工档案（注册时立即匹配，匹配失败则拒绝注册）
+        WorkforceMatchResult matchResult;
         try {
-            matchResult = directoryClient
-                    .matchForRegistration(dto.realName(), dto.deptId(), dto.phone(), dto.email())
+            matchResult = workforceClient
+                    .matchForRegister(dto.realName(), dto.deptId(), dto.phone(), dto.email())
                     .block();
         } catch (Exception e) {
-            log.error("调用租户目录匹配注册主体失败: {}", e.getMessage(), e);
-            throw new BizException("目录信息查询失败，请稍后重试");
+            log.error("调用业务服务匹配员工档案失败: exception={}", e.getClass().getSimpleName());
+            throw new BizException("员工信息查询失败，请稍后重试");
         }
 
-        if (matchResult == null || matchResult.subjectId() == null) {
-            if (matchResult != null && matchResult.alreadyLinked()) {
-                throw new BizException("匹配到的目录主体已绑定系统账户，如有问题请联系管理员");
+        if (matchResult == null || matchResult.personnelId() == null) {
+            if (matchResult != null && matchResult.alreadyHasAccount()) {
+                throw new BizException("匹配到的员工档案已绑定系统账户，如有问题请联系管理员");
             }
-            throw new BizException("未找到匹配的目录主体，请确认注册信息或联系管理员");
+            throw new BizException("未找到匹配的员工档案，请确认姓名/手机/邮箱是否与档案一致，或联系管理员");
         }
-        if (matchResult.alreadyLinked()) {
-            throw new BizException("该目录主体已绑定系统账户，如有疑问请联系管理员");
+        if (matchResult.alreadyHasAccount()) {
+            throw new BizException("该员工档案已绑定系统账户，如有疑问请联系管理员");
         }
 
         // 5. 自动生成唯一用户名
@@ -157,13 +158,12 @@ public class RegisterServiceImpl
         record.setPhone(dto.phone());
         record.setGender(dto.gender());
         record.setDeptId(dto.deptId());
-        record.setDirectorySubjectId(matchResult.subjectId());
+        record.setPersonnelId(matchResult.personnelId());
         record.setUsername(username);
         Register saved = submissionTransactionService.submit(record);
-        log.info("用户注册申请已提交: recordId={}, username={}, directorySubjectId={}",
-                saved.getId(), username, matchResult.subjectId());
+        log.info("用户注册申请已提交: recordId={}", saved.getId());
 
-        return new RegisterResultVO(saved.getId(), username, matchResult.displayName());
+        return new RegisterResultVO(saved.getId(), username, matchResult.personnelName());
     }
 
     @Override
@@ -197,11 +197,11 @@ public class RegisterServiceImpl
                 Dept registerDept = deptRepository.findByIdAndDeletedFalse(record.getDeptId())
                         .orElseThrow(() -> new BizException("注册部门不存在或已停用"));
                 String newUsername = generateUniqueUsername(registerDept, record.getRealName());
-                log.warn("原用户名已被占用，重新生成: old={}, new={}", record.getUsername(), newUsername);
+                log.warn("原用户名已被占用，已重新生成: recordId={}", record.getId());
                 record.setUsername(newUsername);
             }
 
-            // 创建用户账户（不创建外部目录主体）
+            // 创建用户账户（仅此操作，不创建员工档案）
             User user = new User();
             user.setUsername(record.getUsername());
             user.setPassword(record.getPassword());   // 注册时已加密
@@ -216,7 +216,7 @@ public class RegisterServiceImpl
 
             User savedUser = userRepository.save(user);
             record.setUserId(savedUser.getId());
-            log.info("注册审核通过，用户账户创建成功: recordId={}, userId={}", id, savedUser.getId());
+            log.info("注册审核通过，用户账户创建成功: recordId={}", id);
 
             RegistrationOutbox outbox = new RegistrationOutbox();
             outbox.setAggregateId(record.getId());
@@ -226,7 +226,7 @@ public class RegisterServiceImpl
             registrationOutboxRepository.save(outbox);
         } else {
             record.setRegistrationState(RegisterState.REJECTED);
-            log.info("注册申请已拒绝: recordId={}, auditorId={}", id, auditorId);
+            log.info("注册申请已拒绝: recordId={}", id);
         }
 
         repository.save(record);

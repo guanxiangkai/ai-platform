@@ -4,18 +4,14 @@ import io.github.guanxiangkai.redis.plus.core.redis.RedisBackend;
 import io.github.guanxiangkai.redis.plus.core.redis.StringRedisBackend;
 import io.github.guanxiangkai.redis.plus.core.script.DefaultRedisScriptExecutor;
 import io.github.guanxiangkai.redis.plus.core.script.RedisScriptExecutor;
+import io.github.guanxiangkai.redis.plus.datasource.LettuceConnectionFactoryBuilder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisPassword;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.util.StringUtils;
 
 /**
  * 为 redis-plus 提供基础 RedisConnectionFactory，避免其多数据源工厂在回退到单数据源模式时
@@ -28,23 +24,23 @@ public class SystemRedisConfiguration {
     @Primary
     @ConditionalOnMissingBean(name = "redisConnectionFactory")
     public RedisConnectionFactory redisConnectionFactory(DataRedisProperties properties) {
-        RedisStandaloneConfiguration standalone = new RedisStandaloneConfiguration();
-        standalone.setHostName(properties.getHost());
-        standalone.setPort(properties.getPort());
-        standalone.setDatabase(properties.getDatabase());
-        if (StringUtils.hasText(properties.getUsername())) {
-            standalone.setUsername(properties.getUsername());
-        }
-        if (StringUtils.hasText(properties.getPassword())) {
-            standalone.setPassword(RedisPassword.of(properties.getPassword()));
-        }
-
-        LettuceClientConfiguration.LettuceClientConfigurationBuilder clientBuilder = LettuceClientConfiguration.builder();
+        LettuceConnectionFactoryBuilder builder = LettuceConnectionFactoryBuilder
+                .standalone(properties.getHost(), properties.getPort())
+                .database(properties.getDatabase())
+                .username(properties.getUsername())
+                .password(properties.getPassword())
+                .clientName(properties.getClientName())
+                .ssl(properties.getSsl().isEnabled(), false, true);
         if (properties.getTimeout() != null) {
-            clientBuilder.commandTimeout(properties.getTimeout());
+            builder.commandTimeout(properties.getTimeout());
         }
-
-        return new LettuceConnectionFactory(standalone, clientBuilder.build());
+        if (properties.getConnectTimeout() != null) {
+            builder.connectTimeout(properties.getConnectTimeout());
+        }
+        if (properties.getLettuce().getShutdownTimeout() != null) {
+            builder.shutdownTimeout(properties.getLettuce().getShutdownTimeout());
+        }
+        return builder.build();
     }
 
     @Bean

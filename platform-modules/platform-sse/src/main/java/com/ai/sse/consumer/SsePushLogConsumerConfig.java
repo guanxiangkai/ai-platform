@@ -65,7 +65,8 @@ public class SsePushLogConsumerConfig {
                 pushRecordService.createEntity(entity);
                 log.info("SSE推送日志保存成功: messageId={}, status={}", record.messageId(), record.pushStatus());
             } catch (Exception e) {
-                log.error("保存SSE推送日志失败: messageId={}", record.messageId(), e);
+                log.error("保存SSE推送日志失败: messageId={}, exception={}",
+                        record.messageId(), e.getClass().getSimpleName());
                 throw new RuntimeException("保存SSE推送日志失败", e);
             }
         };

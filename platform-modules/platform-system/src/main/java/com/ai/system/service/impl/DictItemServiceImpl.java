@@ -195,7 +195,8 @@ public class DictItemServiceImpl extends BaseServiceImpl<DictItemPageDTO, DictIt
                 dictRefresher.invalidate(dictCode);
                 dictRefresher.refresh();
             } catch (Exception e) {
-                log.warn("[DictItemServiceImpl] Web Plus 字典缓存刷新失败: dictCode={}", dictCode, e);
+                log.warn("[DictItemServiceImpl] Web Plus 字典缓存刷新失败: dictCode={}, exception={}",
+                        dictCode, e.getClass().getSimpleName());
             }
         }
         cacheDictProvider.refresh(dictCode);

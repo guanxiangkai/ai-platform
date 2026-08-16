@@ -1,0 +1,57 @@
+# Data ID: application.yml
+# Group 和 Namespace 均由部署环境指定；禁止用它们区分租户。
+
+db:
+  url: jdbc:postgresql://${PLATFORM_DB_HOST}:${PLATFORM_DB_PORT}/${PLATFORM_DB_NAME}?currentSchema=${PLATFORM_DB_SCHEMA}
+  username: ${PLATFORM_DB_USERNAME}
+  password: ${PLATFORM_DB_PASSWORD}
+  driver-class-name: org.postgresql.Driver
+
+redis:
+  host: ${REDIS_HOST}
+  port: ${REDIS_PORT}
+  password: ${REDIS_PASSWORD}
+  database: ${PLATFORM_REDIS_DATABASE}
+
+redis-plus:
+  lock:
+    redisson:
+      address: redis://${redis.host}:${redis.port}
+      password: ${redis.password}
+      database: ${redis.database}
+
+jpa-plus:
+  enabled: false
+  encrypt:
+    active-version: v1
+    keys:
+      v1: ${PLATFORM_ENCRYPT_KEY}
+
+ai:
+  security:
+    redis:
+      host: ${redis.host}
+      port: ${redis.port}
+      password: ${redis.password}
+      database: ${PLATFORM_REDIS_DATABASE}
+
+web-plus:
+  cors:
+    enabled: false
+  security:
+    trusted-forward:
+      header-name: X-Trusted-Forward-Token
+      token: ${TRUSTED_FORWARD_TOKEN}
+
+powerjob:
+  worker:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized

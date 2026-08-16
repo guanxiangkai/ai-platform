@@ -1,12 +1,12 @@
 package com.ai.api.files.config;
 
-import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import com.ai.api.context.TenantExecutionScope;
-import io.github.guanxiangkai.web.plus.core.properties.TrustedForwardProperties;
-import io.github.guanxiangkai.web.plus.security.util.SecurityUtils;
 import com.ai.api.files.client.FilesClient;
 import com.ai.api.files.dto.FileBusinessFileDTO;
 import com.ai.api.files.dto.FileUploadResultDTO;
+import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
+import io.github.guanxiangkai.web.plus.core.properties.TrustedForwardProperties;
+import io.github.guanxiangkai.web.plus.security.client.TenantForwardingExchangeFilterFunction;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -19,10 +19,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
-import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.ClientRequest;
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -66,7 +63,8 @@ public class FilesClientConfig {
                 .defaultHeader(AuthConstants.HeaderConstants.USER_ID,
                         AuthConstants.HeaderConstants.INTERNAL_SERVICE_USER_ID)
                 .defaultHeader(trustedForwardProperties.getHeaderName(), trustedForwardProperties.getToken())
-                .filter(tenantForwardingFilter())
+                .filter(new TenantForwardingExchangeFilterFunction(
+                        TenantExecutionScope::currentTenantId))
                 .filter(lbFunction)
                 .build();
 
@@ -92,8 +90,7 @@ public class FilesClientConfig {
                             .block(filesClientProperties.getUploadTimeout());
 
                     if (response == null || !Integer.valueOf(200).equals(response.get("code"))) {
-                        throw new IllegalStateException("文件上传失败："
-                                + (response != null ? response.get("message") : "未知错误"));
+                        throw new IllegalStateException("文件上传失败");
                     }
                     Object dataObject = response.get("data");
                     if (!(dataObject instanceof Map<?, ?> data)) {
@@ -109,7 +106,7 @@ public class FilesClientConfig {
                             stringValue(data.get("hash"))
                     );
                 } catch (Exception exception) {
-                    throw new IllegalStateException("调用平台文件上传接口失败：" + exception.getMessage(), exception);
+                    throw new IllegalStateException("调用平台文件上传接口失败", exception);
                 }
             }
 
@@ -148,8 +145,7 @@ public class FilesClientConfig {
                         .bodyToMono(Map.class)
                         .block(filesClientProperties.getBusinessFileOperationTimeout());
                 if (response == null || !Integer.valueOf(200).equals(response.get("code"))) {
-                    throw new IllegalStateException("业务附件操作失败："
-                            + (response != null ? response.get("message") : "未知错误"));
+                    throw new IllegalStateException("业务附件操作失败");
                 }
                 return response;
             }
@@ -162,25 +158,6 @@ public class FilesClientConfig {
                         .toEntityFlux(DataBuffer.class)
                         .timeout(filesClientProperties.getDownloadResponseTimeout());
             }
-        };
-    }
-
-    private static ExchangeFilterFunction tenantForwardingFilter() {
-        return (request, next) -> {
-            if (request.headers().getFirst(AuthConstants.HeaderConstants.TENANT_ID) != null) {
-                return next.exchange(request);
-            }
-            String tenantId = SecurityUtils.getTenantId();
-            if (!StringUtils.hasText(tenantId)) {
-                tenantId = TenantExecutionScope.currentTenantId();
-            }
-            if (!StringUtils.hasText(tenantId)) {
-                return next.exchange(request);
-            }
-            ClientRequest tenantRequest = ClientRequest.from(request)
-                    .header(AuthConstants.HeaderConstants.TENANT_ID, tenantId)
-                    .build();
-            return next.exchange(tenantRequest);
         };
     }
 

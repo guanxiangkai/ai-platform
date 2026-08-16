@@ -35,7 +35,7 @@ public class OssLog extends BaseLog {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 所属业务模块（如 AVATAR / KNOWLEDGE / WORK_TICKET / DOCUMENT / TEMP 等）
+     * 所属业务模块（如 PROFILE / KNOWLEDGE / DOCUMENT / TEMP 等）
      * <p>由调用方在 {@code @OssLog} 注解或上传接口中指定，便于按功能模块筛选附件</p>
      */
     @Column(name = "biz_module", length = 50, comment = "业务模块标识")

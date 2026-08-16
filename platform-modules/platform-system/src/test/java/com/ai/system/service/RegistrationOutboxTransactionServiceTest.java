@@ -177,7 +177,7 @@ class RegistrationOutboxTransactionServiceTest {
     private Register record(RegisterState state) {
         Register record = new Register();
         record.setId("register-1");
-        record.setDirectorySubjectId("subject-1");
+        record.setPersonnelId("personnel-1");
         record.setUserId("user-1");
         record.setRegistrationState(state);
         return record;

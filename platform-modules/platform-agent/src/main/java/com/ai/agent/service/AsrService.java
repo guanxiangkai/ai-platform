@@ -135,7 +135,7 @@ public class AsrService {
     private Mono<Void> failed(AgentVoiceRecord record, Throwable error) {
         return Mono.fromRunnable(() -> {
             record.setRecognitionStatus(AgentVoiceRecognitionState.FAILED);
-            record.setErrorMessage(limit(error.getMessage(), AgentVoiceRecord.ERROR_MESSAGE_MAX_LENGTH));
+            record.setErrorMessage(error.getClass().getSimpleName());
             records.save(record);
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }

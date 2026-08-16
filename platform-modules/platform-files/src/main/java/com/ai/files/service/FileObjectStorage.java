@@ -187,6 +187,6 @@ public class FileObjectStorage {
         if (exception.statusCode() == 404 || "NoSuchKey".equals(errorCode)) {
             return new ResponseStatusException(NOT_FOUND, "文件内容不存在");
         }
-        return new BizException("读取对象存储失败：" + exception.getMessage());
+        return new BizException("读取对象存储失败");
     }
 }

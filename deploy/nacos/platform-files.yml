@@ -1,0 +1,56 @@
+# Data ID: platform-files.yml
+# Group 由部署环境指定。
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  data:
+    redis:
+      host: ${redis.host}
+      port: ${redis.port}
+      password: ${redis.password}
+      database: ${redis.database}
+  codec:
+    max-in-memory-size: 1MB
+  webflux:
+    multipart:
+      max-in-memory-size: 1MB
+      max-disk-usage-per-part: 2GB
+      max-parts: 20
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          url: ${db.url}
+          username: ${db.username}
+          password: ${db.password}
+          driver-class-name: ${db.driver-class-name}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+jpa-plus:
+  enabled: true
+
+platform:
+  files:
+    default-personal-quota-bytes: ${FILES_PERSONAL_QUOTA_BYTES:10737418240}
+    default-department-quota-bytes: ${FILES_DEPARTMENT_QUOTA_BYTES:107374182400}
+    default-system-quota-bytes: ${FILES_SYSTEM_QUOTA_BYTES:107374182400}
+    max-file-size-bytes: ${FILES_MAX_FILE_SIZE_BYTES:2147483648}
+    access-url-ttl: ${FILES_ACCESS_URL_TTL:10m}
+    edit-lock-ttl: ${FILES_EDIT_LOCK_TTL:30m}
+    object-operation-timeout: ${FILES_OBJECT_OPERATION_TIMEOUT:30m}
+    upload-lease: ${FILES_UPLOAD_LEASE:45m}
+    reconcile-retry-delay: ${FILES_RECONCILE_RETRY_DELAY:1m}
+    reconcile-interval: ${FILES_RECONCILE_INTERVAL:30s}
+    reconcile-batch-size: ${FILES_RECONCILE_BATCH_SIZE:50}
+
+oss:
+  endpoint: ${OSS_ENDPOINT}
+  access-key: ${OSS_ACCESS_KEY}
+  secret-key: ${OSS_SECRET_KEY}
+  bucket: ${OSS_BUCKET}
+  region: ${OSS_REGION}
+  path-style-access-enabled: true

@@ -4,7 +4,7 @@ import com.ai.sse.core.RedisSseMessageBridge;
 import com.ai.sse.core.SseOperations;
 import com.ai.sse.handler.SseMessageDispatcher;
 import com.ai.sse.model.SseMessage;
-import com.ai.api.sse.dto.SseNotification.TargetType;
+import com.ai.sse.model.mq.SseNotification.TargetType;
 import com.ai.sse.service.ISseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

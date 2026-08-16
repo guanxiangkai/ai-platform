@@ -142,10 +142,9 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
         User user = repository.findById(id)
                 .orElseThrow(() -> BizException.notFound("用户不存在"));
         String username = user.getUsername();
-        String tenantId = user.getTenantId();
         super.delete(id);
         authorizationCacheService.evictUser(id);
-        authUserCacheService.evictAfterCommit(id, tenantId, username);
+        authUserCacheService.evictAfterCommit(id, username);
     }
 
     @Override

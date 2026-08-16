@@ -2,7 +2,6 @@ package com.ai.gateway.filter;
 
 import com.ai.gateway.constant.FilterOrder;
 import com.ai.gateway.constant.GatewayConstants;
-import com.ai.gateway.util.ReactiveRequestUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -21,11 +20,9 @@ import java.util.UUID;
  * 职责：
  * <ol>
  *   <li>为每个请求生成唯一 traceId 并写入请求头</li>
- *   <li>记录请求入口日志（方法、路径、来源IP）</li>
+ *   <li>记录请求入口日志（方法、路径）</li>
  *   <li>记录请求耗时</li>
  * </ol>
- * IP 获取复用 {@link ReactiveRequestUtils#getClientIp}。
- *
  * @author guanxiangkai
  * @since 1.0.0
  */
@@ -46,9 +43,7 @@ public class RequestLogFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String method = request.getMethod().name();
         String path = request.getURI().getPath();
-        String clientIp = ReactiveRequestUtils.getClientIp(request);
-
-        log.info("[{}] >>> {} {} from {}", traceId, method, path, clientIp);
+        log.info("[{}] >>> {} {}", traceId, method, path);
 
         exchange.getAttributes().put(GatewayConstants.ExchangeAttributeConstants.START_TIME, System.currentTimeMillis());
 

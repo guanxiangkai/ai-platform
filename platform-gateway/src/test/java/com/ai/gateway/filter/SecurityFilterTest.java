@@ -14,12 +14,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SecurityFilterTest {
 
     @Test
-    void ordinaryQueryParametersDoNotTriggerXssDetection() {
+    void personnelIdQueryParameterDoesNotTriggerXssDetection() {
         SecurityFilter filter = new SecurityFilter(new AiGatewayProperties());
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get(
-                "/catalog/items?pageNum=1&pageSize=100"
-                        + "&subjectId=subject-1"
-                        + "&status=active&startDate=2026-05-04&endDate=2026-05-10"
+                "/business/staff/attendance/list?pageNum=1&pageSize=999"
+                        + "&personnelId=683bf06c-d7e6-54bd-9f6f-897bc2b7f2bb"
+                        + "&attendanceType=leave&startDate=2026-05-04&endDate=2026-05-10"
+                        + "&timestamp=1778650121873"
         ).build());
         AtomicBoolean chainCalled = new AtomicBoolean(false);
 
@@ -36,7 +37,7 @@ class SecurityFilterTest {
     void eventHandlerAttributeStillTriggersXssDetection() {
         SecurityFilter filter = new SecurityFilter(new AiGatewayProperties());
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest
-                .get("/catalog/items")
+                .get("/business/staff/attendance/list")
                 .queryParam("keyword", "onerror=alert(1)")
                 .build());
 

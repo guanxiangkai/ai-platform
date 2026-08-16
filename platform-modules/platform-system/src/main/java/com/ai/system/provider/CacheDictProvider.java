@@ -97,7 +97,8 @@ public class CacheDictProvider implements DictProvider {
             cacheTemplate.evict(SystemConstants.CacheConstants.DICT_CACHE_NAME, dictCode);
             cacheTemplate.evict(SystemConstants.CacheConstants.DICT_CACHE_NAME, dictCode + ":items");
         } catch (Exception e) {
-            log.error("刷新字典缓存失败: dictCode={}", dictCode, e);
+            log.error("刷新字典缓存失败: dictCode={}, exception={}",
+                    dictCode, e.getClass().getSimpleName());
         }
     }
 
@@ -120,7 +121,8 @@ public class CacheDictProvider implements DictProvider {
                             e.getSortOrder()))
                     .collect(Collectors.toList());
         } catch (Exception e) {
-            log.error("加载字典项数据失败: dictCode={}", dictCode, e);
+            log.error("加载字典项数据失败: dictCode={}, exception={}",
+                    dictCode, e.getClass().getSimpleName());
             return Collections.emptyList();
         }
     }
@@ -141,7 +143,8 @@ public class CacheDictProvider implements DictProvider {
             }
             return labels;
         } catch (Exception e) {
-            log.error("加载字典数据失败: dictCode={}", dictCode, e);
+            log.error("加载字典数据失败: dictCode={}, exception={}",
+                    dictCode, e.getClass().getSimpleName());
             return Collections.emptyMap();
         }
     }
@@ -157,7 +160,8 @@ public class CacheDictProvider implements DictProvider {
                     k -> loadLabels(dictCode));
             return labels != null ? labels : Collections.emptyMap();
         } catch (Exception e) {
-            log.debug("字典缓存读取失败，回退直接查询: dictCode={}", dictCode, e);
+            log.debug("字典缓存读取失败，回退直接查询: dictCode={}, exception={}",
+                    dictCode, e.getClass().getSimpleName());
             return loadLabels(dictCode);
         }
     }

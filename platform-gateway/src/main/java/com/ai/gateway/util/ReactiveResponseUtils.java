@@ -4,6 +4,7 @@ import cn.hutool.json.JSONUtil;
 import io.github.guanxiangkai.web.plus.core.model.ApiResponse;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.server.ServerWebExchange;
@@ -53,7 +54,7 @@ public final class ReactiveResponseUtils {
             if (response.isCommitted()) {
                 return Mono.empty();
             }
-            response.setStatusCode(HttpStatus.valueOf(code));
+            response.setStatusCode(HttpStatusCode.valueOf(code));
             response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
             // 复用 web-plus-core 的 ApiResponse + Hutool JSONUtil，保持全链路响应格式统一

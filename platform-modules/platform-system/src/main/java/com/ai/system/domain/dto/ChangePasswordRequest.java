@@ -1,5 +1,6 @@
 package com.ai.system.domain.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
@@ -17,10 +18,17 @@ public record ChangePasswordRequest(
 
         @NotBlank(message = "旧密码不能为空")
         @Schema(description = "旧密码")
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         String oldPassword,
 
         @NotBlank(message = "新密码不能为空")
         @Schema(description = "新密码")
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         String newPassword
 ) {
+    /** 返回不包含旧密码或新密码的诊断摘要。 */
+    @Override
+    public String toString() {
+        return "ChangePasswordRequest[credentials=<redacted>]";
+    }
 }

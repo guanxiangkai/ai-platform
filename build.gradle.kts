@@ -46,12 +46,14 @@ val lombokPlugin: Provider<PluginDependency> = libs.plugins.lombok
 val springBootDependencies: Provider<MinimalExternalModuleDependency> = libs.spring.boot.dependencies
 val springCloudDependencies: Provider<MinimalExternalModuleDependency> = libs.spring.cloud.dependencies
 val springCloudAlibabaDependencies: Provider<MinimalExternalModuleDependency> = libs.spring.cloud.alibaba.dependencies
+val jackson3Bom: Provider<MinimalExternalModuleDependency> = libs.jackson3.bom
+val jackson2Bom: Provider<MinimalExternalModuleDependency> = libs.jackson2.bom
+val nettyBom: Provider<MinimalExternalModuleDependency> = libs.netty.bom
+val runtimeSecurityPatches: Provider<ExternalModuleDependencyBundle> = libs.bundles.runtime.security.patches
 
-val springBootStarterTest: Provider<MinimalExternalModuleDependency> = libs.spring.boot.starter.test
-val junitJupiter: Provider<MinimalExternalModuleDependency> = libs.junit.jupiter
+val testingBundle: Provider<ExternalModuleDependencyBundle> = libs.bundles.testing
 val junitPlatformLauncher: Provider<MinimalExternalModuleDependency> = libs.junit.platform.launcher
 val slf4jApi: Provider<MinimalExternalModuleDependency> = libs.slf4j.api
-val logbackClassic: Provider<MinimalExternalModuleDependency> = libs.logback.classic
 
 subprojects {
     apply {
@@ -60,6 +62,10 @@ subprojects {
     }
 
     dependencies {
+        // 主框架 BOM 保持不变，只覆盖已确认存在漏洞且兼容的运行时补丁版本。
+        "api"(platform(jackson3Bom.get()))
+        "api"(platform(jackson2Bom.get()))
+        "api"(platform(nettyBom.get()))
         // 导入 Spring Boot BOM（使用 api 确保版本管理传递到依赖方）
         // ⚠️ 根脚本 subprojects {} 中 Kotlin DSL 无法直接使用 api()，需通过字符串配置名
         "api"(platform(springBootDependencies.get()))
@@ -73,12 +79,14 @@ subprojects {
         "api"(platform(springCloudAlibabaDependencies.get()))
         // Lombok @Slf4j 生成的 Logger 字段需要编译期 SLF4J API
         "api"(slf4jApi)
+        constraints {
+            runtimeSecurityPatches.get().forEach { dependency ->
+                // 版本目录返回不可变最小依赖；作为约束导入即可保留其精确版本。
+                "api"(dependency)
+            }
+        }
 
-        // 日志实现（仅运行时需要，编译时通过 SLF4J 抽象层使用）
-        runtimeOnly(logbackClassic)
-
-        testImplementation(springBootStarterTest)
-        testImplementation(junitJupiter)
+        testImplementation(testingBundle)
         testRuntimeOnly(junitPlatformLauncher)
     }
 
@@ -89,14 +97,4 @@ subprojects {
         }
     }
 
-}
-
-val buildAll = tasks.register("buildAll") {
-    group = "build"
-    description = "构建并测试全部平台模块"
-    dependsOn(subprojects.map { it.tasks.named("build") })
-}
-
-tasks.named("build") {
-    dependsOn(buildAll)
 }

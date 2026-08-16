@@ -51,7 +51,8 @@ public final class GatewayPathMatcher {
         try {
             return Optional.of(PARSER.parse(pattern));
         } catch (PatternParseException ex) {
-            log.warn("[GatewayPathMatcher] 忽略非法路径模式: pattern={}, error={}", pattern, ex.getMessage());
+            log.warn("[GatewayPathMatcher] 忽略非法路径模式: pattern={}, exception={}",
+                    pattern, ex.getClass().getSimpleName());
             return Optional.empty();
         }
     }

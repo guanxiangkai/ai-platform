@@ -9,53 +9,55 @@
 spring-boot = "4.1.0"          # Spring Boot 4.1 稳定线；具体 Framework / Security / Data 版本由官方 BOM 管理，升级需重点验证网关、JPA、HTTP 客户端默认行为
 spring-cloud = "2025.1.2"       # Spring Cloud 2025.1.2（Oakwood，官方引入 Spring Boot 4.1.0 兼容性）
 spring-cloud-alibaba = "2025.1.0.0"     # Spring Cloud Alibaba 全家桶（Nacos / Sentinel / Seata 等）
-aspectj = "1.9.25.1"
+# Boot 4.1 所在 Jackson 3.1 LTS 线与第三方仍使用的 Jackson 2 稳定线，均固定到已修复补丁。
+jackson3 = "3.1.5"
+jackson2 = "2.22.1"
+# Netty 保持 Boot 4.1 的 4.2 兼容线，仅提升到官方已发布并修复已知漏洞的补丁版本。
+netty = "4.2.16.Final"
+# 生产运行时的安全补丁版本；不跨相关库的大版本或预发布线。
+postgresql = "42.7.13"
+httpcore5 = "5.4.3"
+bouncycastle = "1.85.2"
+commons-io = "2.21.0"
+lz4 = "1.11.1"
 
 # ─────────────────────────── 工具包 ──────────────────────────────
 hutool = "5.8.47"         # Hutool 工具类集合（JWT 解析、加密、日期等）
-
-# ─────────────────────────── 数据库 ──────────────────────────────
-postgresql = "42.7.13"         # PostgreSQL JDBC 驱动
-
-# ─────────────────────────── 分布式缓存 ─────────────────────────
-caffeine = "3.2.4"          # Caffeine 本地缓存（一级缓存 / L1）
-
-# ─────────────────────────── 日志 ────────────────────────────────
-logback = "1.6.1"         # Logback 日志实现
 
 # ─────────────────────────── API 文档 ────────────────────────────
 springdoc = "3.1.0"          # SpringDoc OpenAPI（Swagger UI，兼容 Boot 4+）
 
 # ─────────────────────────── JWT / JOSE ─────────────────────────
-nimbus-jose-jwt = "10.9.1"   # Nimbus JOSE + JWT（ai-auth 直接使用 SignedJWT / RSASSASigner / RSASSAVerifier API）
+nimbus-jose-jwt = "10.9.1"   # Nimbus JOSE + JWT（platform-auth 直接使用 SignedJWT / RSASSASigner / RSASSAVerifier API）
 jjwt = "0.13.0"              # JJWT（Web Plus Security JWT 签发与校验；升级需验证 Web Plus JWT 兼容性）
 
 # ─────────────────────── 对象映射 ────────────────────────────
-mapstruct-plus = "1.5.2"          # MapStruct Plus 增强（@AutoMapper 自动生成转换器）
+mapstruct-plus = "1.5.2"          # MapStruct Plus 稳定补丁，修复 Record 注解扩散与异常 .msp 解析；需验证生成代码
 lombok-mapstruct-binding = "0.2.0" # 确保 Lombok 在 MapStruct 之前运行的绑定处理器
 
 # ─────────────────────────── 测试 ────────────────────────────────
-junit = "6.1.3"          # JUnit 6
+junit = "6.1.3"          # JUnit 6.1 最新正式补丁，统一 Jupiter 与 Platform 测试运行时
 
 # ─────────────────────────── Gradle 插件 ─────────────────────────
 lombok-plugin = "9.5.0"          # Lombok Gradle 插件
 
 # ─────────────────────────── AI Plus 独立模块版本 ───────────────────────────
 # 已发布版本不可覆盖。每个 Maven 模块独立维护版本，消费方只升级实际需要的模块。
-web-plus-core = "3.1.0"
-web-plus-error = "2.0.0"
-web-plus-web = "5.1.0"
-web-plus-security = "1.0.2"
-web-plus-protection = "2.0.0"
-web-plus-log = "1.1.0"
-web-plus-mq = "1.0.1"
-web-plus-dict = "1.0.2"
-jpa-plus-core = "1.0.1"
-jpa-plus-field = "1.0.1"
-jpa-plus-interceptor = "1.0.1"
-jpa-plus-audit = "1.0.2"
-jpa-plus-starter = "2.1.0"
-redis-plus-starter = "2.0.1"
+web-plus-core = "3.2.0"
+web-plus-error = "2.0.1"
+web-plus-web = "5.2.0"
+web-plus-security = "1.2.0"
+web-plus-protection = "2.1.0"
+web-plus-log = "2.0.0"
+web-plus-mq = "1.0.2"
+web-plus-dict = "1.0.3"
+jpa-plus-core = "1.0.2"
+jpa-plus-field = "1.0.2"
+jpa-plus-interceptor = "1.0.2"
+jpa-plus-audit = "1.0.3"
+jpa-plus-starter = "2.1.1"
+redis-plus-datasource = "1.1.0"
+redis-plus-starter = "2.1.0"
 
 pinyin4j = "2.5.1"                # Pinyin4j 中文拼音引擎（Maven Central 可解析，供 Hutool PinyinUtil 自动发现使用）
 
@@ -65,11 +67,7 @@ fastexcel = "1.3.0"               # FastExcel 导入导出（Web Plus 与消费�
 poi = "5.5.1"                     # Apache POI（Word 模板处理：doc/docx）
 
 # ─────────────────────────── OSS（S3 兼容存储）────────────────────
-aws-sdk = "2.51.3"          # AWS SDK v2（S3 兼容客户端，对接 SeaweedFS / MinIO 等）
-
-# ─────────────────────────── Reactor ────────────────────────────
-micrometer-context-propagation = "1.2.1"  # Micrometer Context Propagation（ThreadLocal 跨 Reactor 线程传播）
-
+aws-sdk = "2.50.2"          # AWS SDK v2 稳定补丁线（S3 兼容客户端）；未追逐 8 月 11 日刚发布的 2.52.0
 
 # ╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
 # ║                                  libraries —— 依赖坐标定义区                                       ║
@@ -81,13 +79,15 @@ micrometer-context-propagation = "1.2.1"  # Micrometer Context Propagation（Thr
 # ═══════════════════════════ Spring Boot 核心 ═══════════════════════════
 # BOM（依赖版本管理，不引入实际 jar）
 spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "spring-boot" }
+# 基础运行时的安全补丁 BOM；所有平台模块通过根构建统一解析。
+jackson3-bom = { group = "tools.jackson", name = "jackson-bom", version.ref = "jackson3" }
+jackson2-bom = { group = "com.fasterxml.jackson", name = "jackson-bom", version.ref = "jackson2" }
+netty-bom = { group = "io.netty", name = "netty-bom", version.ref = "netty" }
 
 # 健康检查 & 监控端点
 spring-boot-starter-actuator = { group = "org.springframework.boot", name = "spring-boot-starter-actuator" }
 
-# OAuth2 Resource Server（内含 nimbus-jose-jwt，用于 RSA/JWKS 签名与验证）
-spring-boot-starter-oauth2-resource-server = { group = "org.springframework.boot", name = "spring-boot-starter-oauth2-resource-server" }
-# Nimbus JOSE + JWT（ai-auth 直接使用其 SignedJWT / RSASSASigner / RSASSAVerifier API）
+# Nimbus JOSE + JWT（platform-auth 直接使用其 SignedJWT / RSASSASigner / RSASSAVerifier API）
 nimbus-jose-jwt = { group = "com.nimbusds", name = "nimbus-jose-jwt", version.ref = "nimbus-jose-jwt" }
 spring-boot-autoconfigure = { group = "org.springframework.boot", name = "spring-boot-autoconfigure" }
 spring-boot-configuration-processor = { group = "org.springframework.boot", name = "spring-boot-configuration-processor" }
@@ -97,7 +97,7 @@ spring-boot-starter-validation = { group = "org.springframework.boot", name = "s
 
 # ═══════════════════════════ WebFlux 响应式 Web ═══════════════════════════
 # ⚠️ 全局统一使用 WebFlux（Reactor / Netty），不再引入 spring-boot-starter-web（Servlet / Tomcat）
-# WebFlux 天然支持非阻塞 IO + 虚拟线程，适合微服务高并发场景
+# WebFlux 使用非阻塞 I/O 与事件循环，不依赖虚拟线程；阻塞调用仍必须隔离到受控调度器。
 spring-web = { group = "org.springframework", name = "spring-web" }
 spring-context = { group = "org.springframework", name = "spring-context" }
 spring-expression = { group = "org.springframework", name = "spring-expression" }
@@ -106,7 +106,8 @@ spring-tx = { group = "org.springframework", name = "spring-tx" }
 reactor-core = { group = "io.projectreactor", name = "reactor-core" }
 spring-boot-starter-webflux = { group = "org.springframework.boot", name = "spring-boot-starter-webflux" }
 spring-boot-starter-webclient = { group = "org.springframework.boot", name = "spring-boot-starter-webclient" }
-aspectjweaver = { group = "org.aspectj", name = "aspectjweaver", version.ref = "aspectj" }
+# AspectJ 版本由 Spring Boot BOM 托管，避免 AOP 运行库与 Spring 兼容域漂移。
+aspectjweaver = { group = "org.aspectj", name = "aspectjweaver" }
 
 
 # Jackson 3 JSON 序列化；Java Time 已并入 databind，不再声明独立 JSR-310 模块
@@ -128,13 +129,13 @@ spring-cloud-alibaba-starter-nacos-discovery = { group = "com.alibaba.cloud", na
 spring-cloud-alibaba-starter-nacos-config = { group = "com.alibaba.cloud", name = "spring-cloud-starter-alibaba-nacos-config" }
 
 # ═══════════════════════════ 数据库 ═══════════════════════════
-# PostgreSQL JDBC 驱动
+# PostgreSQL JDBC 驱动固定到已修复 channel binding 降级问题的稳定补丁。
 postgresql = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 # Jakarta Persistence 注解 API（无数据库服务中仅为审计/日志实体编译期注解可见性）
 jakarta-persistence-api = { group = "jakarta.persistence", name = "jakarta.persistence-api" }
 
 # ═══════════════════════════ AI Plus（Web Plus / JPA Plus / Redis Plus）═══════════════════════════
-# 公共构件来自 Maven Central；各模块版本独立锁定，禁止依赖本机 Maven Local。
+# 私有构件来自 GitHub Packages；各模块版本独立锁定，禁止依赖本机 Maven Local。
 # ── Web Plus ──────────────────────────────────────────────────────────────────
 web-plus-core = { group = "io.github.guanxiangkai", name = "web-plus-core", version.ref = "web-plus-core" }
 web-plus-error = { group = "io.github.guanxiangkai", name = "web-plus-error", version.ref = "web-plus-error" }
@@ -153,21 +154,28 @@ jpa-plus-core = { group = "io.github.guanxiangkai", name = "jpa-plus-core", vers
 jpa-plus-field = { group = "io.github.guanxiangkai", name = "jpa-plus-field", version.ref = "jpa-plus-field" }
 jpa-plus-interceptor = { group = "io.github.guanxiangkai", name = "jpa-plus-interceptor", version.ref = "jpa-plus-interceptor" }
 jpa-plus-audit = { group = "io.github.guanxiangkai", name = "jpa-plus-audit", version.ref = "jpa-plus-audit" }
-jpa-plus = { group = "io.github.guanxiangkai", name = "jpa-plus-starter", version.ref = "jpa-plus-starter" }
 jpa-plus-starter = { group = "io.github.guanxiangkai", name = "jpa-plus-starter", version.ref = "jpa-plus-starter" }
 pinyin4j = { group = "com.belerweb", name = "pinyin4j", version.ref = "pinyin4j" }
 
 # ── Redis Plus ─────────────────────────────────────────────────────────────────
 # Spring Boot Starter — 全量：分布式锁 / 三级缓存 / 布隆过滤器 / 限流 / 幂等 / 消息队列 /
 # 多数据源 / 治理运维。引入后可按需通过 redis-plus.* 配置各子能力。
-redis-plus = { group = "io.github.guanxiangkai", name = "redis-plus-starter", version.ref = "redis-plus-starter" }
 redis-plus-starter = { group = "io.github.guanxiangkai", name = "redis-plus-starter", version.ref = "redis-plus-starter" }
+# 额外 Redis DB 的统一 Lettuce 构建器；认证、网关和系统服务只消费普通 datasource 模块，避免重复手工装配。
+redis-plus-datasource = { group = "io.github.guanxiangkai", name = "redis-plus-datasource", version.ref = "redis-plus-datasource" }
 
 # ── Web Plus ──────────────────────────────────────────────────────────────────
 # 公共 Web 能力统一消费 io.github.guanxiangkai:* 的 AI Plus 构件。
 
 # PowerJob OpenAPI 客户端（仅供平台调度控制面管理任务定义和实例）
 powerjob-client = { group = "tech.powerjob", name = "powerjob-client", version.ref = "powerjob" }
+
+# 第三方客户端传递依赖的安全补丁约束；均保持原有主版本兼容域。
+httpcore5 = { group = "org.apache.httpcomponents.core5", name = "httpcore5", version.ref = "httpcore5" }
+httpcore5-h2 = { group = "org.apache.httpcomponents.core5", name = "httpcore5-h2", version.ref = "httpcore5" }
+bouncycastle-bcprov-jdk18on = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
+commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
+lz4-java = { group = "at.yawk.lz4", name = "lz4-java", version.ref = "lz4" }
 
 # ═══════════════════════════ FastExcel（Web Plus 内置 / 消费模块注解可见性）═══════════════════════════
 # 消费模块按需显式声明，确保 VO 注解在编译期可见。
@@ -189,17 +197,15 @@ spring-boot-starter-data-redis = { group = "org.springframework.boot", name = "s
 spring-boot-starter-data-redis-reactive = { group = "org.springframework.boot", name = "spring-boot-starter-data-redis-reactive" }
 spring-data-redis = { group = "org.springframework.data", name = "spring-data-redis" }
 # Caffeine 本地缓存（L1 一级缓存）
-caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
+caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine" }
 
 
 # ═══════════════════════════ 工具类 ═══════════════════════════
 # Hutool 全家桶（JWT 解析、加密工具、日期处理、HTTP 客户端等）
 hutool-all = { group = "cn.hutool", name = "hutool-all", version.ref = "hutool" }
 
-# ═══════════════════════════ 日志 ═══════════════════════════
+# ═══════════════════════════ 日志门面 ═══════════════════════════
 slf4j-api = { group = "org.slf4j", name = "slf4j-api" }
-# Logback 日志实现
-logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 
 # ═══════════════════════════ API 文档 ═══════════════════════════
 # SpringDoc OpenAPI — WebFlux 版（Swagger UI 自动适配响应式端点）
@@ -242,10 +248,14 @@ aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "aws-sdk
 
 # ═══════════════════════════ 测试 ═══════════════════════════
 spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-boot-starter-test" }
+# Testcontainers 2.x 的模块坐标使用 testcontainers-* 前缀；版本由 Spring Boot BOM 统一管理。
+testcontainers-junit-jupiter = { group = "org.testcontainers", name = "testcontainers-junit-jupiter" }
+testcontainers-postgresql = { group = "org.testcontainers", name = "testcontainers-postgresql" }
 
 # ═══════════════════════════ Reactor 上下文传播 ═══════════════════════════
 # 让 ThreadLocal 自动跨 Reactor 线程传播（publishOn / subscribeOn）
-micrometer-context-propagation = { group = "io.micrometer", name = "context-propagation", version.ref = "micrometer-context-propagation" }
+# 版本经 Spring Boot 导入的 Micrometer BOM 托管。
+micrometer-context-propagation = { group = "io.micrometer", name = "context-propagation" }
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit" }
 
@@ -260,7 +270,17 @@ junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform
 
 [bundles]
 
-jjwt-runtime = ["jjwt-impl", "jjwt-gson"]
+# 平台运行时传递依赖的稳定安全补丁；由根构建作为约束统一应用，避免各模块重复声明。
+runtime-security-patches = ["postgresql", "httpcore5", "httpcore5-h2", "bouncycastle-bcprov-jdk18on", "commons-io", "lz4-java"]
+
+# 通用单元测试依赖；JUnit Platform Launcher 保持 testRuntimeOnly，避免扩大编译作用域。
+testing = ["spring-boot-starter-test", "junit-jupiter"]
+
+# MapStruct Plus 与 Lombok 的联合注解处理器；二者必须在所有平台实现模块中共同启用。
+mapstruct-processors = ["mapstruct-plus-processor", "lombok-mapstruct-binding"]
+
+# PostgreSQL 集成测试容器；只在需要真实数据库契约验证的模块中启用。
+postgresql-integration-testing = ["testcontainers-junit-jupiter", "testcontainers-postgresql"]
 
 # ─────────────────────── cloud-service（微服务公共依赖）────────────
 # 所有共享平台服务的 Nacos 注册、配置和负载均衡
@@ -271,57 +291,134 @@ cloud-service = [
     "spring-boot-starter-actuator",
 ]
 
-# ─────────────────────── http-interface（声明式 HTTP 客户端契约层）──
-# ai-api 子模块使用：WebFlux（WebClient + @HttpExchange 注解）+ LoadBalancer（服务发现）
-http-interface = [
-    "spring-boot-starter-webflux",
+# ─────────────────────── HTTP 客户端契约与运行实现 ──────────────
+# API 公开签名只暴露 Spring HTTP 注解/资源类型与 Reactor，不把 Boot 自动配置和服务发现传递给消费方。
+http-contract = [
+    "spring-web",
+    "reactor-core",
+]
+
+# Boot 4 拆分后的响应式客户端与 Spring Cloud LoadBalancer 只作为 API 模块内部自动配置实现；
+# 不通过 spring-boot-starter-webflux 引入响应式服务器运行时。
+http-client-runtime = [
+    "spring-boot-starter-webclient",
     "spring-cloud-starter-loadbalancer",
 ]
 
-# ─────────────────────── ai-system（系统管理服务）────────────────
-# platform-system 固定实现依赖：
-#   redis-plus-starter  → 三级缓存 ThreeLevelCacheTemplate（分布式锁 / 布隆过滤器 / 限流）
-#   spring-boot-starter-data-redis → RedisTemplate 等同步 Redis API
-#   web-plus-log       → 日志注解、日志实体与 OssLogHandler SPI
-#   web-plus-mq        → SSE 通知等系统消息生产
-#   caffeine            → 激活 L1 本地缓存（不引入则退化为 ConcurrentHashMap）
-#   pinyin4j            → 中文拼音首字母生成（用户名自动生成，配合 Hutool PinyinUtil）
-ai-system = [
-    "redis-plus-starter",
-    "spring-boot-starter-data-redis",
+# ─────────────────────── 平台 API 契约模块 ───────────────────────
+# 文件 API 固定使用租户透传与 Bean Validation 契约。
+platform-api-files = ["web-plus-security", "spring-boot-starter-validation"]
+
+# Agent API 固定使用租户透传安全契约。
+platform-api-agent = ["web-plus-security"]
+
+# 系统 API 固定使用租户透传、操作日志协议与 Redis Stream。
+platform-api-system = ["web-plus-security", "web-plus-log", "spring-boot-starter-data-redis"]
+
+# 认证服务实体与 OpenAPI 注解仅在编译期可见，不向运行时额外传递文档 UI。
+# 使用独立 auth 命名空间，避免与 platform-auth 叶子 bundle 产生类型安全访问器冲突。
+auth-compileOnly = ["jakarta-persistence-api", "springdoc-openapi-starter-webflux-ui"]
+
+# ─────────────────────── platform-agent（通用智能体服务）─────────
+platform-agent = [
+    "web-plus-core",
+    "web-plus-error",
+    "web-plus-log",
+    "web-plus-security",
+    "spring-boot-starter-webflux",
+    "spring-boot-starter-webclient",
+    "spring-boot-starter-data-jpa",
+    "spring-boot-starter-validation",
+    "springdoc-openapi-starter-webflux-ui",
+    "jpa-plus-starter",
+]
+
+# ─────────────────────── platform-files（文件服务）───────────────
+platform-files = [
+    "web-plus-core",
+    "web-plus-error",
+    "web-plus-security",
+    "spring-boot-starter-webflux",
+    "spring-boot-starter-data-jpa",
+    "springdoc-openapi-starter-webflux-ui",
+    "jpa-plus-starter",
+    "aws-s3",
+]
+
+# ─────────────────────── platform-scheduler（调度控制面）─────────
+platform-scheduler = [
+    "web-plus-core",
+    "web-plus-error",
+    "web-plus-log",
+    "web-plus-security",
+    "spring-boot-starter-webflux",
+    "spring-boot-starter-data-jpa",
+    "spring-boot-starter-validation",
+    "springdoc-openapi-starter-webflux-ui",
+    "jpa-plus-starter",
+    "powerjob-client",
+]
+
+# ─────────────────────── platform-sse（SSE 推送服务）─────────────
+# API 组中的类型会向消费模块暴露，必须与内部实现依赖分开声明。
+platform-sse-api = [
+    "web-plus-core",
+    "web-plus-error",
     "web-plus-log",
     "web-plus-mq",
+    "web-plus-security",
+    "web-plus-web",
+]
+platform-sse-implementation = [
+    "spring-boot-starter-webflux",
+    "spring-boot-starter-webclient",
+    "spring-boot-starter-data-jpa",
+    "spring-boot-starter-data-redis",
+    "springdoc-openapi-starter-webflux-ui",
+    "mapstruct-plus-spring-boot-starter",
+    "jpa-plus-starter",
+]
+
+# ─────────────────────── platform-system（系统管理服务）──────────
+platform-system = [
+    "web-plus-core",
+    "web-plus-dict",
+    "web-plus-error",
+    "web-plus-log",
+    "web-plus-mq",
+    "web-plus-security",
+    "web-plus-web",
+    "spring-boot-starter-webflux",
+    "spring-boot-starter-data-jpa",
+    "spring-boot-starter-data-redis",
+    "spring-boot-starter-validation",
+    "springdoc-openapi-starter-webflux-ui",
+    "mapstruct-plus-spring-boot-starter",
+    "jpa-plus-starter",
+    "redis-plus-starter",
     "caffeine",
     "pinyin4j",
 ]
 
-# ─────────────────────── ai-sse（SSE 推送服务）──────────────────
-# ai-module-sse 固定实现依赖：
-#   web-plus-mq        → SSE 通知与推送日志消息消费/生产
-#   spring-boot-starter-data-redis → SSE 票据、限流与 Redis 桥接
-ai-sse = [
-    "web-plus-mq",
-    "spring-boot-starter-data-redis",
-]
-
-# ─────────────────────── ai-gateway（API 网关 · 纯响应式）─────────
+# ─────────────────────── platform-gateway（API 网关 · 纯响应式）──
 # ⚠️ Gateway 内含 WebFlux + Netty，绝对不可引入 starter-web！
 #   web-plus-core      → 统一响应、用户声明与可信转发配置
 #   web-plus-security  → 网关安全处理器与认证异常处理
-ai-gateway = [
+platform-gateway = [
     "spring-cloud-starter-gateway-server-webflux",
     "spring-cloud-starter-loadbalancer",
     "spring-cloud-alibaba-starter-nacos-discovery",
     "spring-cloud-alibaba-starter-nacos-config",
     "spring-boot-starter-data-redis-reactive",
     "spring-boot-starter-actuator",
-    "spring-boot-starter-oauth2-resource-server",
+    "nimbus-jose-jwt",
     "web-plus-core",
     "web-plus-security",
+    "redis-plus-datasource",
 ]
 
-# ─────────────────────── ai-auth（认证服务）─────────────────────────
-# ai-auth 固定实现依赖：
+# ─────────────────────── platform-auth（认证服务）─────────────────
+# platform-auth 固定实现依赖：
 #   Nacos + Redis      → 服务发现、配置中心、Token 缓存 / 黑名单
 #   web-plus-core      → 统一响应、异常与认证常量
 #   web-plus-security  → JWT 服务接口
@@ -329,8 +426,8 @@ ai-gateway = [
 #   aspectjweaver      → 日志注解 AOP 增强
 #   validation         → @Valid 参数校验运行时支持
 #   nimbus-jose-jwt    → RSA JWT 签发与校验
-# HTTP Interface 客户端由 ai-system-api 自动配置提供。
-ai-auth = [
+# HTTP Interface 客户端由 platform-system-api 自动配置提供。
+platform-auth = [
     "spring-cloud-alibaba-starter-nacos-discovery",
     "spring-cloud-alibaba-starter-nacos-config",
     "spring-cloud-starter-loadbalancer",
@@ -343,18 +440,7 @@ ai-auth = [
     "aspectjweaver",
     "spring-boot-starter-validation",
     "nimbus-jose-jwt",
-]
-
-# ─────────────────────── platform-service（通用领域服务）────────────
-# Agent、文件和调度服务共享的 WebFlux、JPA、OpenAPI 与平台基础能力；模块只追加自身专属依赖。
-platform-service = [
-    "web-plus-core",
-    "web-plus-error",
-    "web-plus-security",
-    "spring-boot-starter-webflux",
-    "spring-boot-starter-data-jpa",
-    "springdoc-openapi-starter-webflux-ui",
-    "jpa-plus-starter",
+    "redis-plus-datasource",
 ]
 
 

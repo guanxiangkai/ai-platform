@@ -1,16 +1,40 @@
 // ===== 预解析 Version Catalog 引用（subprojects {} 内部无法直接访问 libs）=====
-var webPlusCore: Provider<MinimalExternalModuleDependency> = libs.web.plus.core
-var httpInterface: Provider<ExternalModuleDependencyBundle> = libs.bundles.http.`interface`
+val webPlusCore: Provider<MinimalExternalModuleDependency> = libs.web.plus.core
 
 subprojects {
+
+    apply(plugin = "maven-publish")
+
     dependencies {
 
         // ===== api —— 需要暴露给消费方的类型 =====
         api(webPlusCore)                 // ApiResponse、BaseException
 
-        // WebFlux + LoadBalancer（@HttpExchange 声明式客户端 + 负载均衡 WebClient）
-        api(httpInterface)
-
     }
 
+    configure<PublishingExtension> {
+        publications {
+            create<MavenPublication>("platformApi") {
+                from(components["java"])
+            }
+        }
+        repositories {
+            maven {
+                name = "platformPackages"
+                url = uri(
+                    providers.environmentVariable("PLATFORM_MAVEN_REPOSITORY")
+                        .orElse("https://maven.pkg.github.com/guanxiangkai/ai-platform")
+                        .get()
+                )
+                credentials {
+                    username = providers.environmentVariable("PLATFORM_MAVEN_USERNAME")
+                        .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+                        .orNull
+                    password = providers.environmentVariable("PLATFORM_MAVEN_TOKEN")
+                        .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+                        .orNull
+                }
+            }
+        }
+    }
 }

@@ -9,7 +9,7 @@ import io.github.guanxiangkai.web.plus.mq.model.SsePushLogMessage;
 import io.github.guanxiangkai.web.plus.mq.producer.MessageProducer;
 import com.ai.sse.constants.SseConstants;
 import com.ai.sse.consumer.strategy.PushTargetStrategy;
-import com.ai.api.sse.dto.SseNotification;
+import com.ai.sse.model.mq.SseNotification;
 import com.ai.sse.service.ISseService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -108,8 +108,7 @@ public class SseConsumerConfig {
 
             // 2. 检查在线状态（委托给策略）
             if (!strategy.checkOnline(sseService, notification)) {
-                String reason = "目标不在线: " + notification.targetType() + " - " +
-                        (notification.userId() != null ? notification.userId() : notification.userIds());
+                String reason = "目标不在线: " + notification.targetType();
                 publishLog(mqMessage, notification, SseConstants.PushStatus.SKIPPED, reason);
                 log.debug("[SSE-MQ] {}", reason);
                 return;
@@ -121,8 +120,9 @@ public class SseConsumerConfig {
                 strategy.push(sseService, notification);
                 publishLog(mqMessage, notification, SseConstants.PushStatus.SUCCESS, null);
             } catch (Exception e) {
-                log.error("[SSE-MQ] 推送失败: messageId={}", raw.messageId(), e);
-                publishLog(mqMessage, notification, SseConstants.PushStatus.FAILED, e.getMessage());
+                log.error("[SSE-MQ] 推送失败: messageId={}, exception={}",
+                        raw.messageId(), e.getClass().getSimpleName());
+                publishLog(mqMessage, notification, SseConstants.PushStatus.FAILED, "推送执行失败");
                 throw e;
             }
         };
@@ -151,8 +151,8 @@ public class SseConsumerConfig {
             );
             messageProducer.sendAsync(SsePushLogMessage.TOPIC, logMsg);
         } catch (Exception e) {
-            log.warn("[SSE-MQ] 推送日志发布失败（不影响主流程）: messageId={}, error={}",
-                    message.messageId(), e.getMessage());
+            log.warn("[SSE-MQ] 推送日志发布失败（不影响主流程）: messageId={}, exception={}",
+                    message.messageId(), e.getClass().getSimpleName());
         }
     }
 
@@ -171,7 +171,7 @@ public class SseConsumerConfig {
         try {
             return objectMapper.convertValue(payload, SseNotification.class);
         } catch (Exception e) {
-            log.error("[SSE-MQ] payload 转换失败: {}", e.getMessage(), e);
+            log.error("[SSE-MQ] payload 转换失败: exception={}", e.getClass().getSimpleName());
             return null;
         }
     }
@@ -215,12 +215,12 @@ public class SseConsumerConfig {
     private PreferenceResolution resolvePreferenceFailure(
             SseNotification notification, Exception exception) {
         if (properties.pushPreferenceFailurePolicy() == SseProperties.PushPreferenceFailurePolicy.RETRY) {
-            log.error("[SSE-MQ] 推送偏好查询失败，按 RETRY 策略交给消息中间件重试: messageType={}, error={}",
-                    notification.messageType(), exception.getMessage());
+            log.error("[SSE-MQ] 推送偏好查询失败，按 RETRY 策略交给消息中间件重试: messageType={}, exception={}",
+                    notification.messageType(), exception.getClass().getSimpleName());
             throw new IllegalStateException("推送偏好查询失败，等待消息重试", exception);
         }
-        log.warn("[SSE-MQ] 推送偏好查询失败，按 FAIL_CLOSED 策略跳过: messageType={}, error={}",
-                notification.messageType(), exception.getMessage());
+        log.warn("[SSE-MQ] 推送偏好查询失败，按 FAIL_CLOSED 策略跳过: messageType={}, exception={}",
+                notification.messageType(), exception.getClass().getSimpleName());
         return PreferenceResolution.skipped("推送偏好查询失败，已按 FAIL_CLOSED 策略跳过");
     }
 

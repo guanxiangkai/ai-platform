@@ -1,7 +1,6 @@
 package com.ai.system.security;
 
 import cn.hutool.json.JSONUtil;
-import com.ai.api.security.PlatformAuthCacheKeys;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import com.ai.api.context.TenantExecutionScope;
 import com.ai.system.domain.entity.User;
@@ -59,8 +58,8 @@ public class AuthUserCacheService {
         runAfterCommit(() -> refresh(userId, oldUsername, incrementTokenVersion));
     }
 
-    public void evictAfterCommit(String userId, String tenantId, String username) {
-        runAfterCommit(() -> evict(userId, tenantId, username));
+    public void evictAfterCommit(String userId, String username) {
+        runAfterCommit(() -> evict(userId, username));
     }
 
     public void refreshUsersAfterCommit(Collection<String> userIds, boolean incrementTokenVersion) {
@@ -88,7 +87,8 @@ public class AuthUserCacheService {
                     user.tenantId(), () -> refresh(user.userId(), null, false)));
             log.info("[AuthUserCache] 用户认证缓存按租户预热完成: count={}", users.size());
         } catch (Exception e) {
-            log.error("[AuthUserCache] 用户认证缓存预热失败", e);
+            log.error("[AuthUserCache] 用户认证缓存预热失败: exception={}",
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -99,7 +99,7 @@ public class AuthUserCacheService {
         try {
             User user = userRepository.findById(userId).orElse(null);
             if (user == null) {
-                evict(userId, null, oldUsername);
+                evict(userId, oldUsername);
                 return;
             }
 
@@ -123,28 +123,27 @@ public class AuthUserCacheService {
                 );
             }
 
-            redisTemplate.opsForValue().set(
-                    PlatformAuthCacheKeys.usernameIndex(user.getTenantId(), user.getUsername()),
-                    userId);
+            redisTemplate.opsForValue().set(usernameIndexKey(user.getUsername()), userId);
             if (StringUtils.hasText(oldUsername) && !oldUsername.equals(user.getUsername())) {
-                redisTemplate.delete(PlatformAuthCacheKeys.usernameIndex(user.getTenantId(), oldUsername));
+                redisTemplate.delete(usernameIndexKey(oldUsername));
             }
         } catch (Exception e) {
-            log.error("[AuthUserCache] 同步用户认证缓存失败: userId={}, oldUsername={}, incrementTokenVersion={}",
-                    userId, oldUsername, incrementTokenVersion, e);
+            log.error("[AuthUserCache] 同步用户认证缓存失败: incrementTokenVersion={}, exception={}",
+                    incrementTokenVersion, e.getClass().getSimpleName());
         }
     }
 
-    private void evict(String userId, String tenantId, String username) {
+    private void evict(String userId, String username) {
         try {
             if (StringUtils.hasText(userId)) {
                 redisTemplate.delete(authKey(userId));
             }
-            if (StringUtils.hasText(tenantId) && StringUtils.hasText(username)) {
-                redisTemplate.delete(PlatformAuthCacheKeys.usernameIndex(tenantId, username));
+            if (StringUtils.hasText(username)) {
+                redisTemplate.delete(usernameIndexKey(username));
             }
         } catch (Exception e) {
-            log.error("[AuthUserCache] 删除用户认证缓存失败: userId={}, username={}", userId, username, e);
+            log.error("[AuthUserCache] 删除用户认证缓存失败: exception={}",
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -199,6 +198,10 @@ public class AuthUserCacheService {
 
     private String authKey(String userId) {
         return AuthConstants.UserAuthCacheConstants.USER_AUTH_CACHE_PREFIX + userId;
+    }
+
+    private String usernameIndexKey(String username) {
+        return AuthConstants.UserAuthCacheConstants.USERNAME_INDEX_PREFIX + username;
     }
 
     private record TenantUserRef(String userId, String tenantId) {

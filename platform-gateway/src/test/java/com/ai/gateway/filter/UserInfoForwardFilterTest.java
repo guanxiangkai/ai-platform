@@ -28,10 +28,10 @@ class UserInfoForwardFilterTest {
     @Test
     void shouldForwardTrustedTenantContextForAnonymousPortalLogin() {
         AiGatewayProperties properties = new AiGatewayProperties();
-        properties.setTenantPathIds(Map.of("alpha", "tenant-1"));
+        properties.setTenantPathIds(Map.of("product-a", "tenant-1"));
         UserInfoForwardFilter filter = new UserInfoForwardFilter(properties, trustedForwardProperties());
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/alpha/auth/login")
+                MockServerHttpRequest.post("/product-a/auth/login")
                         .header("X-Tenant-Id", "spoofed-tenant")
                         .header("X-Trusted-Forward-Token", "spoofed-token")
                         .build()
@@ -47,15 +47,41 @@ class UserInfoForwardFilterTest {
                 .isEqualTo("tenant-1");
         assertThat(forwarded.get().getRequest().getHeaders().getFirst("X-Trusted-Forward-Token"))
                 .isEqualTo("trusted-token");
+        assertThat(forwarded.get().getRequest().getHeaders()
+                .getFirst(AuthConstants.HeaderConstants.VERIFIED_CLIENT_IP)).isEqualTo("unknown");
+    }
+
+    @Test
+    void shouldOverwriteSpoofedVerifiedClientIpFromTrustedProxyChain() {
+        AiGatewayProperties properties = new AiGatewayProperties();
+        properties.setTenantPathIds(Map.of("product-a", "tenant-1"));
+        properties.setTrustedProxyIps(List.of("198.51.100.7"));
+        UserInfoForwardFilter filter = new UserInfoForwardFilter(properties, trustedForwardProperties());
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/product-a/auth/login")
+                        .header(AuthConstants.HeaderConstants.VERIFIED_CLIENT_IP, "192.0.2.99")
+                        .header("X-Forwarded-For", "203.0.113.40")
+                        .remoteAddress(new java.net.InetSocketAddress("198.51.100.7", 8080))
+                        .build()
+        );
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+
+        filter.filter(exchange, chainExchange -> {
+            forwarded.set(chainExchange);
+            return Mono.empty();
+        }).block();
+
+        assertThat(forwarded.get().getRequest().getHeaders()
+                .getFirst(AuthConstants.HeaderConstants.VERIFIED_CLIENT_IP)).isEqualTo("203.0.113.40");
     }
 
     @Test
     void shouldForwardTrustedTenantContextForAnonymousApiCryptoConfig() {
         AiGatewayProperties properties = new AiGatewayProperties();
-        properties.setTenantPathIds(Map.of("beta", "tenant-beta"));
+        properties.setTenantPathIds(Map.of("product-b", "tenant-2"));
         UserInfoForwardFilter filter = new UserInfoForwardFilter(properties, trustedForwardProperties());
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/beta/api/web-plus/api-crypto/config")
+                MockServerHttpRequest.get("/product-b/api/web-plus/api-crypto/config")
                         .header("X-Tenant-Id", "spoofed-tenant")
                         .header("X-Trusted-Forward-Token", "spoofed-token")
                         .build()
@@ -68,7 +94,7 @@ class UserInfoForwardFilterTest {
         }).block();
 
         HttpHeaders headers = forwarded.get().getRequest().getHeaders();
-        assertThat(headers.getFirst("X-Tenant-Id")).isEqualTo("tenant-beta");
+        assertThat(headers.getFirst("X-Tenant-Id")).isEqualTo("tenant-2");
         assertThat(headers.getFirst("X-Trusted-Forward-Token")).isEqualTo("trusted-token");
     }
 
@@ -121,15 +147,15 @@ class UserInfoForwardFilterTest {
     }
 
     @Test
-    void shouldResolveSuperAdminTenantFromTenantPath() {
+    void shouldResolveSuperAdminTenantFromProductPath() {
         AiGatewayProperties properties = new AiGatewayProperties();
-        properties.setTenantPathIds(Map.of("alpha", "tenant-1", "beta", "tenant-2"));
+        properties.setTenantPathIds(Map.of("product-a", "tenant-1", "product-b", "tenant-2"));
         UserInfoForwardFilter filter = new UserInfoForwardFilter(properties, trustedForwardProperties());
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken("platform-super-admin", null, List.of());
         authentication.setDetails(Map.of("superAdmin", true, "nickname", "超级管理员"));
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/alpha/api/system/log/login/list").build()
+                MockServerHttpRequest.get("/product-a/api/system/log/login/list").build()
         );
         AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
 
@@ -198,7 +224,7 @@ class UserInfoForwardFilterTest {
     @Test
     void shouldKeepAuthorizationForAgentServiceEndpoints() {
         AiGatewayProperties properties = new AiGatewayProperties();
-        properties.setTenantPathIds(Map.of("alpha", "tenant-1", "beta", "tenant-2"));
+        properties.setTenantPathIds(Map.of("product-a", "tenant-1", "product-b", "tenant-2"));
         UserInfoForwardFilter filter = new UserInfoForwardFilter(properties, trustedForwardProperties());
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken("admin-id", null, List.of());
@@ -206,8 +232,34 @@ class UserInfoForwardFilterTest {
 
         assertAuthorizationIsKept(filter, authentication, "/agent/session/ask");
         assertAuthorizationIsKept(filter, authentication, "/api/agent/speech/transcribe");
-        assertAuthorizationIsKept(filter, authentication, "/alpha/agent/session/ask");
-        assertAuthorizationIsKept(filter, authentication, "/beta/api/agent/speech/transcribe");
+        assertAuthorizationIsKept(filter, authentication, "/product-a/agent/session/ask");
+        assertAuthorizationIsKept(filter, authentication, "/product-b/api/agent/speech/transcribe");
+    }
+
+    @Test
+    void shouldStripAuthorizationForUnconfiguredProductLikePath() {
+        AiGatewayProperties properties = new AiGatewayProperties();
+        properties.setTenantPathIds(Map.of("product-a", "tenant-1"));
+        UserInfoForwardFilter filter = new UserInfoForwardFilter(properties, trustedForwardProperties());
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken("admin-id", null, List.of());
+        authentication.setDetails(Map.of("tenantId", "tenant-1", "superAdmin", true));
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/unknown-product/api/agent/session/ask")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token")
+                        .build()
+        );
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+
+        filter.filter(exchange, chainExchange -> {
+                    forwarded.set(chainExchange);
+                    return Mono.empty();
+                })
+                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication))
+                .block();
+
+        assertThat(forwarded.get().getRequest().getHeaders().containsHeader(HttpHeaders.AUTHORIZATION))
+                .isFalse();
     }
 
     private void assertAuthorizationIsKept(

@@ -8,8 +8,6 @@ import com.ai.api.system.dto.ImportDefinitionDTO;
 import com.ai.api.system.dto.PushPreferenceBatchRequest;
 import com.ai.api.system.dto.UserPushPreferenceDTO;
 import com.ai.api.system.dto.UserOrganizationDTO;
-import com.ai.api.system.dto.UserIdentityBatchRequest;
-import com.ai.api.system.dto.UserIdentityDTO;
 import com.ai.api.system.dto.WeatherInfoDTO;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -112,17 +110,6 @@ public interface SystemClient {
             @RequestHeader(AuthConstants.HeaderConstants.TENANT_ID) String tenantId,
             @RequestParam("userId") String userId
     );
-
-    /**
-     * 在当前租户内按用户名批量解析用户身份。
-     *
-     * <p>返回值只包含真实存在且已启用的用户，调用方必须对未返回的账号给出明确错误。</p>
-     *
-     * @param request 用户名批量请求
-     * @return 当前租户内匹配的用户身份
-     */
-    @PostExchange("/organization/users/by-usernames")
-    Mono<List<UserIdentityDTO>> getUsersByUsernames(@RequestBody UserIdentityBatchRequest request);
 
     /** 校验用户是否属于当前租户的指定部门。 */
     @GetExchange("/organization/user-in-dept")

@@ -10,6 +10,7 @@ import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -18,14 +19,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class RateLimitFilterTest {
 
     @Test
-    void redisFailureSkipsRateLimitAndContinuesChain() {
+    void redisFailureRejectsRequestByDefault() {
         ReactiveStringRedisTemplate redis = mock(ReactiveStringRedisTemplate.class);
         when(redis.execute(org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
                 org.mockito.ArgumentMatchers.<List<String>>any(), anyString()))
@@ -38,7 +41,30 @@ class RateLimitFilterTest {
             return Mono.empty();
         };
 
-        filter.filter(exchange, chain).block();
+        assertThatThrownBy(() -> filter.filter(exchange, chain).block())
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(chainCalled).isFalse();
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
+    @Test
+    void explicitlyConfiguredFailOpenContinuesChain() {
+        ReactiveStringRedisTemplate redis = mock(ReactiveStringRedisTemplate.class);
+        when(redis.execute(org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
+                org.mockito.ArgumentMatchers.<List<String>>any(), anyString()))
+                .thenReturn(Flux.error(new IllegalStateException("redis connection reset")));
+        AiGatewayProperties properties = new AiGatewayProperties();
+        properties.setRateLimitFailOpen(true);
+        RateLimitFilter filter = new RateLimitFilter(properties, redis);
+        MockServerWebExchange exchange = loginExchange();
+        AtomicBoolean chainCalled = new AtomicBoolean(false);
+
+        filter.filter(exchange, chainExchange -> {
+            chainCalled.set(true);
+            return Mono.empty();
+        }).block();
 
         assertThat(chainCalled).isTrue();
         assertThat(exchange.getResponse().getStatusCode()).isNull();
@@ -97,6 +123,29 @@ class RateLimitFilterTest {
                 .block();
 
         assertThat(invocationCount).hasValue(1);
+    }
+
+    @Test
+    void directClientCannotSpoofForwardedIpRateLimitKey() {
+        ReactiveStringRedisTemplate redis = mock(ReactiveStringRedisTemplate.class);
+        when(redis.execute(org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
+                org.mockito.ArgumentMatchers.<List<String>>any(), anyString()))
+                .thenReturn(Flux.just(1L));
+        RateLimitFilter filter = new RateLimitFilter(new AiGatewayProperties(), redis);
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/system/profile")
+                .header("X-Forwarded-For", "192.0.2.99")
+                .remoteAddress(new java.net.InetSocketAddress("198.51.100.5", 8080))
+                .build());
+
+        filter.filter(exchange, chainExchange -> Mono.empty()).block();
+
+        org.mockito.Mockito.verify(redis).execute(
+                org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
+                argThat(keys -> keys.size() == 1
+                        && keys.getFirst().startsWith("gateway:rate:ip:")
+                        && !keys.getFirst().contains("192.0.2.99")
+                        && !keys.getFirst().contains("198.51.100.5")),
+                anyString());
     }
 
     private static MockServerWebExchange loginExchange() {

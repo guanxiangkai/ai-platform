@@ -115,7 +115,7 @@ public class AgentInvocationService {
         } catch (RuntimeException exception) {
             failReservation(reservation, exception, startedAt);
             if (exception instanceof BizException businessException) throw businessException;
-            throw new BizException("智能体上游调用失败: " + safeMessage(exception));
+            throw new BizException("智能体上游调用失败");
         }
 
         transactions.recordProviderSuccess(reservation, result, elapsedMillis(startedAt));
@@ -161,10 +161,6 @@ public class AgentInvocationService {
         String userId = SecurityUtils.getUserId();
         if (!StringUtils.hasText(userId)) throw new BizException("未获取到当前用户");
         return userId.trim();
-    }
-
-    private String safeMessage(Throwable value) {
-        return StringUtils.hasText(value.getMessage()) ? value.getMessage() : value.getClass().getSimpleName();
     }
 
     private long elapsedMillis(long startedAt) {

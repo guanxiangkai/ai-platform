@@ -58,12 +58,12 @@ public class SseMessageDispatcher {
      */
     public void dispatch(SseMessage<?> message) {
         if (message == null || message.type() == null) {
-            log.warn("无效消息: message={}", message);
+            log.warn("无效 SSE 消息，缺少消息类型");
             return;
         }
 
         String type = message.type();
-        log.debug("调度消息: type={}, senderId={}", type, message.senderId());
+        log.debug("调度消息: type={}", type);
 
         // 1. 执行类型特定处理器
         SseMessageHandler handler = handlers.get(type);
@@ -73,7 +73,8 @@ public class SseMessageDispatcher {
                 dispatchedCount.incrementAndGet();
             } catch (Exception e) {
                 failedCount.incrementAndGet();
-                log.error("消息处理失败: type={}, handler={}", type, handler.getName(), e);
+                log.error("消息处理失败: type={}, handler={}, exception={}",
+                        type, handler.getName(), e.getClass().getSimpleName());
             }
         }
 
@@ -85,7 +86,8 @@ public class SseMessageDispatcher {
                     dispatchedCount.incrementAndGet();
                 } catch (Exception e) {
                     failedCount.incrementAndGet();
-                    log.error("全局处理器执行失败: handler={}", globalHandler.getName(), e);
+                    log.error("全局处理器执行失败: handler={}, exception={}",
+                            globalHandler.getName(), e.getClass().getSimpleName());
                 }
             }
         }

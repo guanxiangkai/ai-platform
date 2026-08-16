@@ -44,7 +44,7 @@ public interface RegisterRepository extends BaseRepository<RegisterPageVO, Regis
     /**
      * 根据用户名判断是否存在尚未审核的注册申请
      */
-    boolean existsByDirectorySubjectIdAndDeletedFalse(String directorySubjectId);
+    boolean existsByPersonnelIdAndDeletedFalse(String personnelId);
 
     /** 锁定注册记录以执行一次性状态转换。 */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -11,7 +11,7 @@ import jakarta.persistence.Converter;
  * @since 1.0.0
  */
 public enum SkillType implements CodedEnum {
-    SYSTEM("system"), GROUP("group"), USER("user");
+    SYSTEM("system"), DEPARTMENT("dept"), PERSONNEL("personnel");
 
     private final String code;
 

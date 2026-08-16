@@ -50,4 +50,15 @@ public record FilesOssProperties(
             throw new IllegalStateException("OSS 访问凭据未配置");
         }
     }
+
+    /**
+     * 返回不包含网关地址、存储桶和访问凭据的诊断摘要。
+     *
+     * @return 已脱敏的对象存储配置摘要
+     */
+    @Override
+    public String toString() {
+        return "FilesOssProperties[connection=<redacted>, region=" + resolvedRegion()
+                + ", pathStyleAccessEnabled=" + resolvedPathStyleAccessEnabled() + ']';
+    }
 }

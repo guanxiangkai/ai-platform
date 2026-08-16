@@ -17,7 +17,7 @@ import com.ai.sse.handler.SseMessageDispatcher;
 import com.ai.sse.listener.SseConnectionEventListener;
 import com.ai.sse.model.SseConnection;
 import com.ai.sse.model.SseMessage;
-import com.ai.api.sse.dto.SseNotification;
+import com.ai.sse.model.mq.SseNotification;
 import com.ai.sse.scheduler.SseHeartbeatScheduler;
 import com.ai.sse.service.impl.SseConnectionRecordServiceImpl;
 import com.ai.sse.service.impl.SseServiceImpl;

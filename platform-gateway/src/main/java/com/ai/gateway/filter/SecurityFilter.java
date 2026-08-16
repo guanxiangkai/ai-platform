@@ -87,7 +87,7 @@ public class SecurityFilter implements GlobalFilter, Ordered {
         if (rawQuery != null) {
             String threat = detectThreat(rawQuery);
             if (threat != null) {
-                log.warn("[安全] 请求 [{}] 查询参数中检测到 {}: {}", path, threat, rawQuery);
+                log.warn("[安全] 请求 [{}] 的原始查询参数中检测到 {}", path, threat);
                 return ReactiveResponseUtils.writeError(exchange, HttpStatus.FORBIDDEN, "请求包含非法字符");
             }
         }
@@ -97,7 +97,7 @@ public class SecurityFilter implements GlobalFilter, Ordered {
             for (String value : entry.getValue()) {
                 String threat = detectThreat(value);
                 if (threat != null) {
-                    log.warn("[安全] 请求 [{}] 参数 [{}] 检测到 {}: {}", path, entry.getKey(), threat, value);
+                    log.warn("[安全] 请求 [{}] 参数 [{}] 检测到 {}", path, entry.getKey(), threat);
                     return ReactiveResponseUtils.writeError(exchange, HttpStatus.FORBIDDEN, "请求参数包含非法字符");
                 }
             }

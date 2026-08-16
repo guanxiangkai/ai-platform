@@ -2,6 +2,7 @@ package com.ai.files.domain.dto;
 
 import com.ai.files.domain.FilePrincipalType;
 import com.ai.files.domain.FileRole;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
 
@@ -38,6 +39,14 @@ public final class FileRequests {
     }
 
     /** 释放编辑锁的请求。 */
-    public record ReleaseLock(String token) {
+    public record ReleaseLock(
+            @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+            String token
+    ) {
+        /** 返回不包含编辑锁令牌的诊断摘要。 */
+        @Override
+        public String toString() {
+            return "ReleaseLock[token=<redacted>]";
+        }
     }
 }

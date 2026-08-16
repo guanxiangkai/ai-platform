@@ -40,7 +40,7 @@ class DeptServiceImplTest {
         );
         Dept postDept = new Dept();
         postDept.setId(POST_DEPT_ID);
-        postDept.setDeptName("产品研发组");
+        postDept.setDeptName("研发一组");
 
         when(postService.getSelectedDeptId(USER_ID)).thenReturn(POST_DEPT_ID);
         when(deptRepository.findByIdAndDeletedFalse(POST_DEPT_ID)).thenReturn(Optional.of(postDept));
@@ -49,7 +49,7 @@ class DeptServiceImplTest {
 
         assertThat(selectedDept).isNotNull();
         assertThat(selectedDept.getId()).isEqualTo(POST_DEPT_ID);
-        assertThat(selectedDept.getDeptName()).isEqualTo("产品研发组");
+        assertThat(selectedDept.getDeptName()).isEqualTo("研发一组");
         verify(postService).getSelectedDeptId(USER_ID);
         verify(deptRepository).findByIdAndDeletedFalse(POST_DEPT_ID);
         verifyNoInteractions(userRepository);

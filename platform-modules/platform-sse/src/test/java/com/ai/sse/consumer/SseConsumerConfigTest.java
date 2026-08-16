@@ -8,7 +8,7 @@ import com.ai.sse.consumer.strategy.BroadcastPushStrategy;
 import com.ai.sse.consumer.strategy.TenantPushStrategy;
 import com.ai.sse.consumer.strategy.UserPushStrategy;
 import com.ai.sse.consumer.strategy.UsersPushStrategy;
-import com.ai.api.sse.dto.SseNotification;
+import com.ai.sse.model.mq.SseNotification;
 import com.ai.sse.service.ISseService;
 import io.github.guanxiangkai.web.plus.mq.model.MqMessage;
 import io.github.guanxiangkai.web.plus.mq.producer.MessageProducer;

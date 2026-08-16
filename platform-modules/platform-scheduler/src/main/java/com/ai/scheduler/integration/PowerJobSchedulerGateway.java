@@ -84,8 +84,7 @@ public class PowerJobSchedulerGateway {
 
     private void requireSuccess(ResultDTO<?> result, String fallback) {
         if (result == null || !result.isSuccess()) {
-            String message = result == null ? null : result.getMessage();
-            throw new BizException(message == null || message.isBlank() ? fallback : fallback + "：" + message);
+            throw new BizException(fallback);
         }
     }
 }

@@ -1,0 +1,55 @@
+# Data ID: platform-system.yml
+# Group 由部署环境指定。
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  data:
+    redis:
+      host: ${redis.host}
+      port: ${redis.port}
+      password: ${redis.password}
+      database: ${redis.database}
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          url: ${db.url}
+          username: ${db.username}
+          password: ${db.password}
+          driver-class-name: ${db.driver-class-name}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+jpa-plus:
+  enabled: true
+  dict:
+    cache:
+      ttl-seconds: ${SYSTEM_DICT_CACHE_TTL_SECONDS:3600}
+
+web-plus:
+  security:
+    permit-patterns:
+      - "GET /web-plus/api-crypto/config"
+
+platform:
+  system:
+    query:
+      option-limit: ${SYSTEM_OPTION_LIMIT:100}
+      maintenance-batch-size: ${SYSTEM_MAINTENANCE_BATCH_SIZE:500}
+    authorization-cache:
+      ttl: ${AUTHORIZATION_CACHE_TTL:5m}
+    operation-log-consumer:
+      pending-batch-size: ${OPERATION_LOG_PENDING_BATCH_SIZE:100}
+      poll-timeout: ${OPERATION_LOG_POLL_TIMEOUT:2s}
+      pending-recovery-delay: ${OPERATION_LOG_PENDING_RECOVERY_DELAY:30s}
+    register-outbox:
+      interval: ${REGISTER_OUTBOX_INTERVAL:5s}
+      batch-size: ${REGISTER_OUTBOX_BATCH_SIZE:20}
+      retry-delay: ${REGISTER_OUTBOX_RETRY_DELAY:1m}
+      processing-lease: ${REGISTER_OUTBOX_PROCESSING_LEASE:2m}
+      max-attempts: ${REGISTER_OUTBOX_MAX_ATTEMPTS:10}
+  workforce:
+    tenants: {}

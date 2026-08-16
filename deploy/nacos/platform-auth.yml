@@ -1,0 +1,33 @@
+# Data ID: platform-auth.yml
+# Group 由部署环境指定。
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  data:
+    redis:
+      host: ${ai.security.redis.host}
+      port: ${ai.security.redis.port}
+      password: ${ai.security.redis.password}
+      database: ${ai.security.redis.database}
+  datasource:
+    url: ${db.url}
+    username: ${db.username}
+    password: ${db.password}
+    driver-class-name: ${db.driver-class-name}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+ai:
+  security:
+    jwt:
+      private-key: ${JWT_PRIVATE_KEY}
+      key-id: ${JWT_KEY_ID:ai-default-key}
+      issuer: ${JWT_ISSUER:ai-platform}
+      access-token-audience: ${JWT_ACCESS_TOKEN_AUDIENCE:ai-platform-gateway}
+      refresh-token-audience: ${JWT_REFRESH_TOKEN_AUDIENCE:ai-platform-auth}
+      access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:2h}
+      refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:7d}
+      allowed-clock-skew: ${JWT_ALLOWED_CLOCK_SKEW:60s}

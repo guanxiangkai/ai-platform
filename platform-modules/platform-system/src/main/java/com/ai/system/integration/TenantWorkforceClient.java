@@ -1,6 +1,5 @@
 package com.ai.system.integration;
 
-import com.ai.system.integration.TenantDirectoryProperties.TenantAdapter;
 import io.github.guanxiangkai.jpa.plus.interceptor.tenant.spi.TenantIdProvider;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import io.github.guanxiangkai.web.plus.core.properties.TrustedForwardProperties;
@@ -14,48 +13,48 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 /**
- * 按租户路由到外部目录适配器。
+ * 按租户路由到业务侧人员档案适配器。
  *
- * <p>服务名来自受控运行配置，平台只依赖稳定的 HTTP 契约，不引用任何消费方实现。</p>
+ * <p>业务服务名来自配置，平台只依赖稳定的 HTTP 契约，不引用任何产品代码。</p>
  */
 @Component
 @RequiredArgsConstructor
-@EnableConfigurationProperties(TenantDirectoryProperties.class)
-public class TenantDirectoryClient {
+@EnableConfigurationProperties(TenantWorkforceProperties.class)
+public class TenantWorkforceClient {
 
-    private final TenantDirectoryProperties properties;
+    private final TenantWorkforceProperties properties;
     private final TenantIdProvider tenantIdProvider;
     private final TrustedForwardProperties trustedForwardProperties;
     private final LoadBalancedExchangeFilterFunction loadBalancer;
     private final WebClient.Builder webClientBuilder;
 
     /**
-     * 在当前租户的目录中匹配注册主体。
+     * 匹配当前租户的人员档案。
      */
-    public Mono<DirectoryMatchResult> matchForRegistration(
-            String displayName,
-            String groupId,
+    public Mono<WorkforceMatchResult> matchForRegister(
+            String realName,
+            String deptId,
             String phone,
             String email
     ) {
         return client().get()
-                .uri(uriBuilder -> uriBuilder.path("/internal/directory/matchForRegistration")
-                        .queryParam("displayName", displayName)
-                        .queryParam("groupId", groupId)
+                .uri(uriBuilder -> uriBuilder.path("/internal/personnel/matchForRegister")
+                        .queryParam("realName", realName)
+                        .queryParam("deptId", deptId)
                         .queryParamIfPresent("phone", optionalText(phone))
                         .queryParamIfPresent("email", optionalText(email))
                         .build())
                 .retrieve()
-                .bodyToMono(DirectoryMatchResult.class);
+                .bodyToMono(WorkforceMatchResult.class);
     }
 
     /**
-     * 将平台账户绑定到当前租户的目录主体。
+     * 将平台账户绑定到当前租户的人员档案。
      */
-    public Mono<Boolean> linkUser(String subjectId, String userId) {
+    public Mono<Boolean> bindUser(String personnelId, String userId) {
         return client().post()
-                .uri(uriBuilder -> uriBuilder.path("/internal/directory/linkUser")
-                        .queryParam("subjectId", subjectId)
+                .uri(uriBuilder -> uriBuilder.path("/internal/personnel/bindUser")
+                        .queryParam("personnelId", personnelId)
                         .queryParam("userId", userId)
                         .build())
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -64,13 +63,13 @@ public class TenantDirectoryClient {
     }
 
     /**
-     * 查询当前目录主体的有效分配信息。
+     * 查询当前租户人员的在岗职位。
      */
-    public Mono<DirectoryAssignment> currentAssignment(String subjectId) {
+    public Mono<WorkforcePosition> currentPosition(String personnelId) {
         return client().get()
-                .uri("/internal/directory/{subjectId}/currentAssignment", subjectId)
+                .uri("/internal/personnel/{personnelId}/currentPosition", personnelId)
                 .retrieve()
-                .bodyToMono(DirectoryAssignment.class);
+                .bodyToMono(WorkforcePosition.class);
     }
 
     private WebClient client() {
@@ -78,8 +77,8 @@ public class TenantDirectoryClient {
         if (!StringUtils.hasText(tenantId)) {
             throw new IllegalStateException("当前请求缺少租户标识");
         }
-        TenantAdapter adapter = properties.requireAdapter(tenantId);
-        trustedForwardProperties.validateConfigured("平台租户目录适配客户端");
+        TenantWorkforceProperties.TenantAdapter adapter = properties.requireAdapter(tenantId);
+        trustedForwardProperties.validateConfigured("平台租户业务适配客户端");
         return webClientBuilder.clone()
                 .baseUrl("http://" + adapter.serviceName().trim())
                 .defaultHeader(AuthConstants.HeaderConstants.USER_ID,

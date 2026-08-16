@@ -17,9 +17,7 @@ class AgentClientContractTest {
         assertThat(AgentClient.class.getMethod(
                 "invoke", String.class, String.class, AgentInvokeRequest.class)).isNotNull();
 
-        Class<?> internalClient = Class.forName(
-                "com.ai.api.agent.config.AgentClientConfig$InternalAgentClient");
-        Method invoke = internalClient.getDeclaredMethod(
+        Method invoke = AgentClientConfig.InternalAgentClient.class.getDeclaredMethod(
                 "invoke", String.class, String.class, String.class, AgentInvokeRequest.class);
         RequestHeader idempotencyKeyHeader = invoke.getParameters()[2].getAnnotation(RequestHeader.class);
 

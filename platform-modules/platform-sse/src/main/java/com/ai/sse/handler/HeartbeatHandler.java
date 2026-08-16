@@ -26,7 +26,7 @@ public final class HeartbeatHandler implements SseMessageHandler {
         }
         SseMessage<String> response = SseMessage.heartbeat(senderId);
         sseOperations.sendToUser(senderId, response);
-        log.debug("心跳响应: userId={}", senderId);
+        log.debug("心跳响应已发送");
     }
 
     @Override

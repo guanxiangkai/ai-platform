@@ -1,0 +1,72 @@
+# Data ID: platform-gateway.yml
+# Group 由部署环境指定。
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  data:
+    redis:
+      host: ${ai.security.redis.host}
+      port: ${ai.security.redis.port}
+      password: ${ai.security.redis.password}
+      database: ${ai.security.redis.database}
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # Spring Cloud Gateway 5.0.2 修复了不可信代理转发头问题；基础模板默认不信任任何前置代理。
+          # 若网关前确有受控反向代理，必须同时按部署拓扑配置此正则与 ai.gateway.trusted-proxy-ips。
+          trusted-proxies: '${GATEWAY_TRUSTED_PROXIES_REGEX:(?!)}'
+          httpserver:
+            customizer-enabled: false
+          x-forwarded:
+            for-append: false
+          routes:
+            - id: platform-auth
+              uri: lb://platform-auth
+              predicates: ["Path=/auth/**,/api/auth/**"]
+              filters: ['RewritePath=/(?:api/)?(?<segment>.*), /$\{segment}']
+            - id: platform-system
+              uri: lb://platform-system
+              predicates: ["Path=/system/**,/api/system/**,/management/admin/**,/api/management/admin/**,/web-plus/api-crypto/config,/api/web-plus/api-crypto/config"]
+              filters: ['RewritePath=/(?:api/)?(?<segment>.*), /$\{segment}']
+            - id: platform-files
+              uri: lb://platform-files
+              predicates: ["Path=/files/**,/api/files/**"]
+              filters: ['RewritePath=/(?:api/)?(?<segment>.*), /$\{segment}']
+            - id: platform-sse
+              uri: lb://platform-sse
+              predicates: ["Path=/sse/**,/api/sse/**"]
+              filters: ['RewritePath=/(?:api/)?(?<segment>.*), /$\{segment}']
+            - id: platform-scheduler
+              uri: lb://platform-scheduler
+              predicates: ["Path=/scheduler/**,/api/scheduler/**"]
+              filters: ['RewritePath=/(?:api/)?(?<segment>.*), /$\{segment}']
+            - id: platform-agent
+              uri: lb://platform-agent
+              predicates: ["Path=/agent/**,/api/agent/**"]
+              filters: ['RewritePath=/(?:api/)?(?<segment>.*), /$\{segment}']
+
+ai:
+  gateway:
+    public-key: ${JWT_PUBLIC_KEY}
+    key-id: ${JWT_KEY_ID:ai-default-key}
+    issuer: ${JWT_ISSUER:ai-platform}
+    access-token-audience: ${JWT_ACCESS_TOKEN_AUDIENCE:ai-platform-gateway}
+    allowed-clock-skew: ${JWT_ALLOWED_CLOCK_SKEW:60s}
+    # 只接受精确 IP，不支持 CIDR；无前置代理时保持空列表。
+    trusted-proxy-ips: []
+    # Redis 限流后端故障时默认拒绝请求，防止登录防暴破和全局限流被静默绕过。
+    rate-limit-fail-open: ${GATEWAY_RATE_LIMIT_FAIL_OPEN:false}
+    tenant-path-ids: {}
+    tenant-exclude-paths: []
+    exclude-paths:
+      - /auth/login
+      - /auth/refresh
+      - /api/auth/login
+      - /api/auth/refresh
+      - /web-plus/api-crypto/config
+      - /api/web-plus/api-crypto/config
+      - /actuator/health
+      - /actuator/info

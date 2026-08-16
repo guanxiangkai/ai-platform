@@ -78,14 +78,14 @@ public class Setting extends DataTenantEntity {
     private Integer sessionTimeout;
 
     /**
-     * 应用命名空间扩展偏好。
+     * 产品命名空间扩展偏好。
      *
-     * <p>平台只负责按当前租户和用户保存完整命名空间对象，不解释应用内部字段。例如消费方可使用
-     * {@code application.workbench}；禁止把应用专属字段重新增加到本实体。</p>
+     * <p>平台只负责按当前租户和用户保存完整命名空间对象，不解释产品内部字段。例如产品工作台使用
+     * {@code product.workbench}，其他产品应使用自己的命名空间，禁止把产品字段重新增加到本实体。</p>
      */
-    @Schema(description = "按应用命名空间隔离的扩展偏好")
+    @Schema(description = "按产品命名空间隔离的扩展偏好")
     @Builder.Default
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "extensions", nullable = false, columnDefinition = "jsonb", comment = "应用命名空间扩展偏好")
+    @Column(name = "extensions", nullable = false, columnDefinition = "jsonb", comment = "产品命名空间扩展偏好")
     private Map<String, Object> extensions = new LinkedHashMap<>();
 }

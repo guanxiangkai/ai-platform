@@ -2,7 +2,7 @@ package com.ai.sse.core;
 
 import com.ai.sse.config.SseProperties;
 import com.ai.sse.model.SseMessage;
-import com.ai.api.sse.dto.SseNotification.TargetType;
+import com.ai.sse.model.mq.SseNotification.TargetType;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
@@ -77,7 +77,8 @@ public class RedisSseMessageBridge implements MessageListener {
             redisTemplate.convertAndSend(channel, json);
             log.debug("[SSE-PubSub] 消息已发布: targetType={}, instanceId={}", targetType, instanceId);
         } catch (Exception e) {
-            log.error("[SSE-PubSub] 发布消息失败: targetType={}", targetType, e);
+            log.error("[SSE-PubSub] 发布消息失败: targetType={}, exception={}",
+                    targetType, e.getClass().getSimpleName());
         }
     }
 
@@ -100,7 +101,8 @@ public class RedisSseMessageBridge implements MessageListener {
             // 本地投递
             deliverLocally(payload);
         } catch (Exception e) {
-            log.error("[SSE-PubSub] 处理订阅消息失败", e);
+            log.error("[SSE-PubSub] 处理订阅消息失败: exception={}",
+                    e.getClass().getSimpleName());
         }
     }
 

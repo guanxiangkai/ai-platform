@@ -68,6 +68,19 @@ public record AuthUserSnapshot(
         return Boolean.TRUE.equals(enabled);
     }
 
+    /**
+     * 返回不包含身份标识、口令哈希和授权明细的诊断摘要。
+     *
+     * @return 已脱敏的认证用户快照摘要
+     */
+    @Override
+    public String toString() {
+        return "AuthUserSnapshot[identity=<redacted>, passwordHash=<redacted>, enabled=" + enabled
+                + ", tokenVersion=" + tokenVersion
+                + ", superAdmin=" + superAdmin
+                + ", authorization=<redacted>]";
+    }
+
     private static String value(Map<Object, Object> hash, String field) {
         Object value = hash.get(field);
         return value == null ? null : value.toString();

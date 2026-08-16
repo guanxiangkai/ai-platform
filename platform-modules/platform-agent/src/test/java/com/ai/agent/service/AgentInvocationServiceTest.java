@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
@@ -97,6 +98,30 @@ class AgentInvocationServiceTest {
         ordered.verify(provider).invoke(any(), any());
         ordered.verify(transactions).recordProviderSuccess(any(), any(), anyLong());
         ordered.verify(transactions).finalizeSuccess("tenant-1", "invocation-1", "user-1");
+    }
+
+    @Test
+    void providerInfrastructureDetailsShouldNotReachApiError() {
+        AgentConfig definition = definition();
+        AgentInvocationRequest request = request("invocation-1");
+        AgentSessionRecord session = new AgentSessionRecord();
+        session.setId("session-1");
+        session.setTenantId("tenant-1");
+        AgentInvocationTransactionService.Reservation reservation =
+                AgentInvocationTransactionService.Reservation.execute(
+                        "invocation-1", "token-1", session, List.of());
+        AgentProviderClient provider = mock(AgentProviderClient.class);
+        when(management.requireDefinition("agent-1")).thenReturn(definition);
+        when(transactions.reserve(any(), any(), any(), any(), any(), any())).thenReturn(reservation);
+        when(providers.require(AgentProviderType.DIFY)).thenReturn(provider);
+        when(provider.invoke(any(), any())).thenThrow(
+                new IllegalStateException("endpoint=https://private.example, token=secret"));
+
+        assertThatThrownBy(() -> service.invoke("agent-1", request))
+                .hasMessage("智能体上游调用失败")
+                .hasMessageNotContaining("private.example")
+                .hasMessageNotContaining("secret");
+        verify(transactions).fail(any(), any(IllegalStateException.class), anyLong());
     }
 
     private AgentConfig definition() {

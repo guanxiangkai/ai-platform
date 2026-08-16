@@ -14,7 +14,7 @@ class PowerJobClientRegistryTest {
     void rejectsMissingApplicationConfiguration() {
         PowerJobClientRegistry registry = new PowerJobClientRegistry(new SchedulerProperties());
 
-        assertThatThrownBy(() -> registry.client("example", null))
+        assertThatThrownBy(() -> registry.client("product", null))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("调度应用配置不存在");
     }
@@ -23,10 +23,10 @@ class PowerJobClientRegistryTest {
     void rejectsMissingServerAddressBeforeCreatingClient() {
         SchedulerProperties properties = new SchedulerProperties();
         properties.setServerAddresses(List.of(" "));
-        SchedulerProperties.Application application = application("example-worker", "secret");
+        SchedulerProperties.Application application = application("product-service", "secret");
         PowerJobClientRegistry registry = new PowerJobClientRegistry(properties);
 
-        assertThatThrownBy(() -> registry.client("example", application))
+        assertThatThrownBy(() -> registry.client("product", application))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("PowerJob Server 地址未配置");
     }
@@ -37,7 +37,7 @@ class PowerJobClientRegistryTest {
         properties.setServerAddresses(List.of("powerjob-server:7700"));
         PowerJobClientRegistry registry = new PowerJobClientRegistry(properties);
 
-        assertThatThrownBy(() -> registry.client("example", application("example-worker", " ")))
+        assertThatThrownBy(() -> registry.client("product", application("product-service", " ")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("PowerJob 应用名称或访问凭据未配置");
     }

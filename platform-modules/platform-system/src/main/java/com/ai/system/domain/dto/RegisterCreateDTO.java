@@ -1,6 +1,7 @@
 package com.ai.system.domain.dto;
 
 import com.ai.system.domain.entity.Register;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.linpeilie.annotations.AutoMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
@@ -31,6 +32,7 @@ public record RegisterCreateDTO(
         String realName,
 
         @Schema(description = "密码", requiredMode = Schema.RequiredMode.REQUIRED)
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         @NotBlank(message = "密码不能为空")
         @Size(min = 6, max = 64, message = "密码长度为6-64个字符")
         String password,
@@ -58,4 +60,10 @@ public record RegisterCreateDTO(
 ) implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
+
+    /** 返回不包含密码或申请人个人信息的诊断摘要。 */
+    @Override
+    public String toString() {
+        return "RegisterCreateDTO[credentials=<redacted>]";
+    }
 }

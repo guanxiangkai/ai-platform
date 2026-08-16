@@ -25,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -140,6 +141,34 @@ class AgentInvocationTransactionServiceTest {
         verify(calls).compareAndSetSucceeded(
                 "tenant-1", "invocation-1", AgentInvocationState.PROVIDER_SUCCEEDED,
                 AgentInvocationState.SUCCEEDED, "assistant-message-1");
+    }
+
+    @Test
+    void infrastructureFailureShouldPersistOnlyStablePublicSummary() {
+        AgentSessionRecord session = session();
+        session.setActiveInvocationId("invocation-1");
+        AgentCallRecord call = call(AgentInvocationState.RUNNING);
+        call.setExecutionToken("token-1");
+        when(calls.findLockedByTenantIdAndInvocationId("tenant-1", "invocation-1"))
+                .thenReturn(Optional.of(call));
+        when(sessions.findLockedByIdAndTenantId("session-1", "tenant-1"))
+                .thenReturn(Optional.of(session));
+        when(calls.compareAndSetFailed(
+                eq("tenant-1"), eq("invocation-1"), eq("token-1"),
+                eq(AgentInvocationState.RUNNING), eq(AgentInvocationState.FAILED),
+                any(), eq("IllegalStateException"), eq("智能体上游调用失败")))
+                .thenReturn(1);
+        AgentInvocationTransactionService.Reservation reservation =
+                AgentInvocationTransactionService.Reservation.execute(
+                        "invocation-1", "token-1", session, List.of());
+
+        service.fail(reservation,
+                new IllegalStateException("endpoint=https://private.example, token=secret"), 12L);
+
+        verify(calls).compareAndSetFailed(
+                "tenant-1", "invocation-1", "token-1",
+                AgentInvocationState.RUNNING, AgentInvocationState.FAILED,
+                12L, "IllegalStateException", "智能体上游调用失败");
     }
 
     private AgentSessionRecord session() {

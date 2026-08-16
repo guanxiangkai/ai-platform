@@ -23,8 +23,8 @@ public record RegisterResultVO(
         @Schema(description = "系统为您生成的账号名，请牢记，登录时需要使用此账号")
         String username,
 
-        @Schema(description = "匹配到的目录主体名称（确认信息）")
-        String directoryDisplayName
+        @Schema(description = "匹配到的员工姓名（确认信息）")
+        String personnelName
 
 ) implements Serializable {
     @Serial

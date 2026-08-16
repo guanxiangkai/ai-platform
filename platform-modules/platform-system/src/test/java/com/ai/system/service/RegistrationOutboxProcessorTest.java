@@ -7,8 +7,8 @@ import com.ai.system.domain.RegisterState;
 import com.ai.system.domain.entity.Register;
 import com.ai.system.domain.entity.RegistrationOutbox;
 import com.ai.system.domain.entity.Role;
-import com.ai.system.integration.DirectoryAssignment;
-import com.ai.system.integration.TenantDirectoryClient;
+import com.ai.system.integration.TenantWorkforceClient;
+import com.ai.system.integration.WorkforcePosition;
 import com.ai.system.repository.RegisterOutboxTenantCatalog;
 import com.ai.system.repository.RegistrationOutboxRepository;
 import com.ai.system.repository.RoleRepository;
@@ -41,7 +41,7 @@ class RegistrationOutboxProcessorTest {
 
     private final RegistrationOutboxRepository outboxRepository = mock(RegistrationOutboxRepository.class);
     private final RoleRepository roleRepository = mock(RoleRepository.class);
-    private final TenantDirectoryClient directoryClient = mock(TenantDirectoryClient.class);
+    private final TenantWorkforceClient workforceClient = mock(TenantWorkforceClient.class);
     private final RegisterOutboxTenantCatalog tenantCatalog = mock(RegisterOutboxTenantCatalog.class);
     private final RegisterOutboxProperties properties = new RegisterOutboxProperties();
     private final RegistrationOutboxTransactionService transactions =
@@ -54,24 +54,24 @@ class RegistrationOutboxProcessorTest {
         processor = new RegistrationOutboxProcessor(
                 outboxRepository,
                 roleRepository,
-                directoryClient,
+                workforceClient,
                 tenantCatalog,
                 properties,
                 transactions);
     }
 
     @Test
-    void processShouldActivateAfterAssignmentRoleAndBindingSucceed() {
+    void processShouldActivateAfterPositionRoleAndBindingSucceed() {
         RegistrationOutbox event = event();
         Register record = record();
-        DirectoryAssignment assignment = new DirectoryAssignment("assignment-1", "成员", "group-1", "示例组");
+        WorkforcePosition position = new WorkforcePosition("position-1", "操作员", "dept-1", "运行部");
         Role role = new Role();
         role.setId("role-1");
         when(transactions.claim(event.getId())).thenReturn(record);
-        when(directoryClient.currentAssignment(record.getDirectorySubjectId())).thenReturn(Mono.just(assignment));
-        when(roleRepository.findFirstByRoleNameAndEnabledTrueAndDeletedFalse("示例组成员"))
+        when(workforceClient.currentPosition(record.getPersonnelId())).thenReturn(Mono.just(position));
+        when(roleRepository.findFirstByRoleNameAndEnabledTrueAndDeletedFalse("运行部操作员"))
                 .thenReturn(Optional.of(role));
-        when(directoryClient.linkUser(record.getDirectorySubjectId(), record.getUserId())).thenReturn(Mono.just(true));
+        when(workforceClient.bindUser(record.getPersonnelId(), record.getUserId())).thenReturn(Mono.just(true));
 
         processor.process(event);
 
@@ -86,14 +86,28 @@ class RegistrationOutboxProcessorTest {
         Role role = new Role();
         role.setId("role-1");
         when(transactions.claim(event.getId())).thenReturn(record);
-        when(directoryClient.currentAssignment(record.getDirectorySubjectId())).thenReturn(Mono.empty());
+        when(workforceClient.currentPosition(record.getPersonnelId())).thenReturn(Mono.empty());
         when(roleRepository.findFirstByDefaultRegistrationRoleTrueAndEnabledTrueAndDeletedFalse())
                 .thenReturn(Optional.of(role));
-        when(directoryClient.linkUser(record.getDirectorySubjectId(), record.getUserId())).thenReturn(Mono.just(false));
+        when(workforceClient.bindUser(record.getPersonnelId(), record.getUserId())).thenReturn(Mono.just(false));
 
         processor.process(event);
 
-        verify(transactions).retry(event.getId(), "目录绑定或角色解析未完成");
+        verify(transactions).retry(event.getId(), "人员绑定或角色解析未完成");
+        verify(transactions, never()).activate(any(), any());
+    }
+
+    @Test
+    void processShouldNotPersistRemoteExceptionMessage() {
+        RegistrationOutbox event = event();
+        Register record = record();
+        when(transactions.claim(event.getId())).thenReturn(record);
+        when(workforceClient.currentPosition(record.getPersonnelId())).thenReturn(Mono.error(
+                new IllegalStateException("remote-endpoint-detail")));
+
+        processor.process(event);
+
+        verify(transactions).retry(event.getId(), "人员开通依赖调用失败");
         verify(transactions, never()).activate(any(), any());
     }
 
@@ -128,7 +142,7 @@ class RegistrationOutboxProcessorTest {
     private Register record() {
         Register record = new Register();
         record.setId("register-1");
-        record.setDirectorySubjectId("subject-1");
+        record.setPersonnelId("personnel-1");
         record.setUserId("user-1");
         record.setRegistrationState(RegisterState.PROVISIONING);
         return record;

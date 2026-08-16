@@ -38,6 +38,6 @@ class AgentInvocationFingerprintTest {
 
     private AgentInvocationRequest request(Map<String, Object> variables) {
         return new AgentInvocationRequest(
-                "invocation-1", "session-1", "hello", null, "team", "skill-1", variables);
+                "invocation-1", "session-1", "hello", null, "product", "skill-1", variables);
     }
 }

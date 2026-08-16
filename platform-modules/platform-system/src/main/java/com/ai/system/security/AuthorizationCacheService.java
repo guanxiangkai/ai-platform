@@ -41,7 +41,7 @@ public class AuthorizationCacheService {
         try {
             requireCacheTemplate().evict(SystemConstants.CacheConstants.AUTHORIZATION_SCOPE_CACHE_NAME, userId);
         } catch (Exception e) {
-            log.warn("清理用户授权缓存失败: userId={}", userId, e);
+            log.warn("清理用户授权缓存失败: exception={}", e.getClass().getSimpleName());
         }
     }
 
@@ -49,7 +49,7 @@ public class AuthorizationCacheService {
         try {
             requireCacheTemplate().clear(SystemConstants.CacheConstants.AUTHORIZATION_SCOPE_CACHE_NAME);
         } catch (Exception e) {
-            log.warn("清理全部用户授权缓存失败", e);
+            log.warn("清理全部用户授权缓存失败: exception={}", e.getClass().getSimpleName());
         }
     }
 

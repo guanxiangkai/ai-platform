@@ -7,7 +7,6 @@
 # ---------------------------------------------------
 .gradle/
 build/
-.ci/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
@@ -116,18 +115,17 @@ $RECYCLE.BIN/
 *.key
 *.pem
 *.p12
-*.pfx
 *.jks
+*.pfx
 *.keystore
 *.crt
 *.cer
 *.der
-settings.xml
-.npmrc.local
-.pypirc
-auth.json
 credentials*
 secrets*
+auth.json
+.npmrc
+.pypirc
 
 # ---------------------------------------------------
 # 数据库

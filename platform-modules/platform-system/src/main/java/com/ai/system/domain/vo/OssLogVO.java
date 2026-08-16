@@ -39,7 +39,7 @@ public class OssLogVO implements Serializable {
     @Schema(description = "上传状态（SUCCESS/FAIL）")
     private String status;
 
-    @Schema(description = "业务模块（AVATAR/KNOWLEDGE/WORK_TICKET/DOCUMENT/TEMP等）")
+    @Schema(description = "业务模块（PROFILE/KNOWLEDGE/DOCUMENT/TEMP等）")
     private String bizModule;
 
     @Schema(description = "原始文件名")

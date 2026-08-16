@@ -219,7 +219,7 @@ public class RoleServiceImpl extends BaseServiceImpl<RolePageDTO, RolePageVO, Ro
         if (authUserCacheService != null) {
             authUserCacheService.refreshAfterCommit(userId, null, true);
         }
-        log.info("用户{}角色分配完成，共{}个角色", userId, roleIds == null ? 0 : roleIds.size());
+        log.info("用户角色分配完成: roleCount={}", roleIds == null ? 0 : roleIds.size());
     }
 
     private Set<String> findUserIdsByRole(String roleId) {

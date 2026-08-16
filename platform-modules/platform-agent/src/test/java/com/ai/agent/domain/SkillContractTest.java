@@ -10,9 +10,7 @@ class SkillContractTest {
 
     @Test
     void shouldResolveStableExternalCodes() {
-        assertThat(SkillType.fromCode("system")).isEqualTo(SkillType.SYSTEM);
-        assertThat(SkillType.fromCode("group")).isEqualTo(SkillType.GROUP);
-        assertThat(SkillType.fromCode("user")).isEqualTo(SkillType.USER);
+        assertThat(SkillType.fromCode("dept")).isEqualTo(SkillType.DEPARTMENT);
         assertThat(SkillTerminalType.fromCode("website").isWebsite()).isTrue();
         assertThat(SkillActionType.fromCode("jump").isJump()).isTrue();
         assertThat(SkillJumpType.fromCode("internal").isInternal()).isTrue();

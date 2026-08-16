@@ -1,5 +1,6 @@
 package com.ai.gateway.config;
 
+import io.github.guanxiangkai.redis.plus.datasource.LettuceConnectionFactoryBuilder;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
@@ -8,12 +9,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisPassword;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
-import org.springframework.util.StringUtils;
 
 /**
  * 网关读取认证共享 Redis 的专用连接。
@@ -78,21 +75,22 @@ public class GatewayAuthRedisConfiguration {
             int database,
             String username,
             String password) {
-        RedisStandaloneConfiguration standalone = new RedisStandaloneConfiguration();
-        standalone.setHostName(host);
-        standalone.setPort(port);
-        standalone.setDatabase(database);
-        if (StringUtils.hasText(username)) {
-            standalone.setUsername(username);
-        }
-        if (StringUtils.hasText(password)) {
-            standalone.setPassword(RedisPassword.of(password));
-        }
-
-        LettuceClientConfiguration.LettuceClientConfigurationBuilder clientBuilder = LettuceClientConfiguration.builder();
+        LettuceConnectionFactoryBuilder builder = LettuceConnectionFactoryBuilder
+                .standalone(host, port)
+                .database(database)
+                .username(username)
+                .password(password)
+                .clientName(properties.getClientName())
+                .ssl(properties.getSsl().isEnabled(), false, true);
         if (properties.getTimeout() != null) {
-            clientBuilder.commandTimeout(properties.getTimeout());
+            builder.commandTimeout(properties.getTimeout());
         }
-        return new LettuceConnectionFactory(standalone, clientBuilder.build());
+        if (properties.getConnectTimeout() != null) {
+            builder.connectTimeout(properties.getConnectTimeout());
+        }
+        if (properties.getLettuce().getShutdownTimeout() != null) {
+            builder.shutdownTimeout(properties.getLettuce().getShutdownTimeout());
+        }
+        return builder.build();
     }
 }

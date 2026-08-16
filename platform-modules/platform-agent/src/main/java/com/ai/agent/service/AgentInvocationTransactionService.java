@@ -186,7 +186,7 @@ class AgentInvocationTransactionService {
                 AgentInvocationState.FAILED,
                 latencyMs,
                 exception.getClass().getSimpleName(),
-                limit(safeMessage(exception), AgentCallRecord.ERROR_MESSAGE_MAX_LENGTH)
+                publicErrorMessage(exception)
         );
         if (changed != 1) {
             return;
@@ -353,8 +353,11 @@ class AgentInvocationTransactionService {
         return StringUtils.hasText(value) ? value.trim() : fallback;
     }
 
-    private String safeMessage(Throwable value) {
-        return StringUtils.hasText(value.getMessage()) ? value.getMessage() : value.getClass().getSimpleName();
+    private String publicErrorMessage(Throwable value) {
+        if (value instanceof BizException && StringUtils.hasText(value.getMessage())) {
+            return limit(value.getMessage(), AgentCallRecord.ERROR_MESSAGE_MAX_LENGTH);
+        }
+        return "智能体上游调用失败";
     }
 
     private String limit(String value, int max) {
@@ -385,6 +388,13 @@ class AgentInvocationTransactionService {
 
         Reservation {
             history = history == null ? List.of() : List.copyOf(history);
+        }
+
+        @Override
+        public String toString() {
+            return "Reservation[action=" + action
+                    + ", identity=<redacted>, executionToken=<redacted>, historySize=" + history.size()
+                    + ", completed=" + (completedResult != null) + ']';
         }
 
         static Reservation execute(

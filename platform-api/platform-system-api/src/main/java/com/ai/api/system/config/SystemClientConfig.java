@@ -10,12 +10,10 @@ import com.ai.api.system.dto.PushPreferenceBatchRequest;
 import com.ai.api.system.dto.WeatherInfoDTO;
 import com.ai.api.system.dto.UserPushPreferenceDTO;
 import com.ai.api.system.dto.UserOrganizationDTO;
-import com.ai.api.system.dto.UserIdentityBatchRequest;
-import com.ai.api.system.dto.UserIdentityDTO;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import io.github.guanxiangkai.web.plus.core.exception.ServiceUnavailableException;
 import io.github.guanxiangkai.web.plus.core.properties.TrustedForwardProperties;
-import io.github.guanxiangkai.web.plus.security.util.SecurityUtils;
+import io.github.guanxiangkai.web.plus.security.client.TenantForwardingExchangeFilterFunction;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -24,12 +22,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.client.loadbalancer.reactive.LoadBalancedExchangeFilterFunction;
 import org.springframework.context.annotation.Bean;
-import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.support.WebClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -129,11 +125,6 @@ public class SystemClientConfig {
             }
 
             @Override
-            public Mono<List<UserIdentityDTO>> getUsersByUsernames(UserIdentityBatchRequest request) {
-                return propagateFailure(proxy.getUsersByUsernames(request), "getUsersByUsernames");
-            }
-
-            @Override
             public Mono<Boolean> isUserInDept(String userId, String deptId) {
                 return propagateFailure(proxy.isUserInDept(userId, deptId), "isUserInDept");
             }
@@ -152,21 +143,7 @@ public class SystemClientConfig {
     }
 
     static ExchangeFilterFunction tenantForwardingFilter() {
-        return (request, next) -> {
-            if (request.headers().getFirst(AuthConstants.HeaderConstants.TENANT_ID) != null) {
-                return next.exchange(request);
-            }
-            String tenantId = SecurityUtils.getTenantId();
-            if (!StringUtils.hasText(tenantId)) {
-                tenantId = TenantExecutionScope.currentTenantId();
-            }
-            if (!StringUtils.hasText(tenantId)) {
-                return next.exchange(request);
-            }
-            ClientRequest tenantRequest = ClientRequest.from(request)
-                    .header(AuthConstants.HeaderConstants.TENANT_ID, tenantId)
-                    .build();
-            return next.exchange(tenantRequest);
-        };
+        return new TenantForwardingExchangeFilterFunction(
+                TenantExecutionScope::currentTenantId);
     }
 }

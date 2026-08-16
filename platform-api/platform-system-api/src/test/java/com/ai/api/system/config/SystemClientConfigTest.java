@@ -152,8 +152,6 @@ class SystemClientConfigTest {
         invocations.put("getUserOrganization", client.getUserOrganization("user-1"));
         invocations.put("getUserOrganizationForTenant",
                 client.getUserOrganizationForTenant("tenant-1", "user-1"));
-        invocations.put("getUsersByUsernames", client.getUsersByUsernames(
-                new com.ai.api.system.dto.UserIdentityBatchRequest(java.util.List.of("user"))));
         invocations.put("isUserInDept", client.isUserInDept("user-1", "dept-1"));
         invocations.put("isUserInDeptForTenant",
                 client.isUserInDeptForTenant("tenant-1", "user-1", "dept-1"));

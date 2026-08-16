@@ -3,7 +3,6 @@ package com.ai.gateway.config;
 import io.github.guanxiangkai.web.plus.core.properties.TrustedForwardProperties;
 import io.github.guanxiangkai.web.plus.security.handler.CustomAuthenticationEntryPoint;
 import com.ai.gateway.filter.GatewayJwtAuthFilter;
-import com.ai.gateway.util.GatewayPathMatcher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -56,14 +55,14 @@ public class GatewaySecurityConfig {
                         // 避免 Nacos 配置刷新后 SecurityWebFilterChain 的静态快照过期。
                         .anyExchange().access((authentication, context) -> {
                             String path = context.getExchange().getRequest().getURI().getPath();
-                            boolean excluded = GatewayPathMatcher.matchesAny(props.getExcludePaths(), path);
+                            boolean excluded = props.isExcludedPath(path);
                             if (excluded) {
                                 return Mono.just(new AuthorizationDecision(true));
                             }
                             return authentication
                                     .map(auth2 -> {
-                                        log.debug("[SecurityAccess] path={}, isAuthenticated={}, principal={}",
-                                                path, auth2.isAuthenticated(), auth2.getPrincipal());
+                                        log.debug("[SecurityAccess] path={}, isAuthenticated={}",
+                                                path, auth2.isAuthenticated());
                                         return auth2.isAuthenticated();
                                     })
                                     .defaultIfEmpty(false)

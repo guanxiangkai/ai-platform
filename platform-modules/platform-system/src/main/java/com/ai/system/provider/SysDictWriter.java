@@ -67,7 +67,8 @@ public class SysDictWriter implements DictWriter {
             log.info("[SysDictWriter] 字典缓存预热完成，共 {} 种类型，{} 条记录",
                     grouped.size(), allItems.size());
         } catch (Exception e) {
-            log.error("[SysDictWriter] 字典缓存预热失败", e);
+            log.error("[SysDictWriter] 字典缓存预热失败: exception={}",
+                    e.getClass().getSimpleName());
         }
     }
 }

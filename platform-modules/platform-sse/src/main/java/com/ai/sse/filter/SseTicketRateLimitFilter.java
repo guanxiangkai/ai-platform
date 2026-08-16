@@ -94,8 +94,8 @@ public class SseTicketRateLimitFilter implements WebFilter, Ordered {
                 .single()
                 .flatMap(count -> {
                     if (count > limit) {
-                        log.warn("[SSE-RateLimit] 票据请求限流: userId={}, count={}, limit={}/{}s",
-                                userId, count, limit, windowSeconds);
+                        log.warn("[SSE-RateLimit] 票据请求限流: count={}, limit={}/{}s",
+                                count, limit, windowSeconds);
                         return rejectResponse(exchange);
                     }
                     return chain.filter(exchange);

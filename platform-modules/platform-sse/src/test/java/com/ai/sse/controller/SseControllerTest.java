@@ -29,7 +29,8 @@ class SseControllerTest {
         SseTicketService ticketService = mock(SseTicketService.class);
         when(ticketService.createTicket(any(), any(), any(), any())).thenReturn("ticket-123");
 
-        SseController target = new SseController(mock(ISseService.class), ticketService);
+        SseController target = new SseController(mock(ISseService.class), ticketService,
+                io.github.guanxiangkai.web.plus.core.net.ClientIpResolver.directPeer());
         AspectJProxyFactory proxyFactory = new AspectJProxyFactory(target);
         proxyFactory.addAspect(new AuthPermissionAspect(permissionResolver(), currentUserProvider()));
         SseController controller = proxyFactory.getProxy();

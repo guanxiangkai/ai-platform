@@ -40,6 +40,31 @@ class WebPlusDomainQueryContractTest {
         assertThat(controller).contains("menuService.getAssignableMenus()", "menuService.getAssignableMenuTree()");
     }
 
+    @Test
+    void mustRequireExplicitInfrastructureAndCurrentWebPlus() throws IOException {
+        String application = readProjectFile("deploy/nacos/application.yml");
+        String agent = readProjectFile("deploy/nacos/platform-agent.yml");
+        String files = readProjectFile("deploy/nacos/platform-files.yml");
+        String compose = readProjectFile("docker/docker-compose.yml");
+
+        assertThat(application)
+                .contains("${PLATFORM_DB_HOST}", "${PLATFORM_DB_PORT}", "${PLATFORM_DB_NAME}",
+                        "${PLATFORM_DB_SCHEMA}", "${REDIS_HOST}", "${REDIS_PORT}");
+        assertThat(agent)
+                .contains("${REDIS_HOST}", "${REDIS_PORT}");
+        assertThat(files)
+                .contains("${OSS_ENDPOINT}", "${OSS_BUCKET}", "${OSS_REGION}");
+        assertThat(compose)
+                .contains("${NACOS_SERVER_ADDR:?NACOS_SERVER_ADDR is required}",
+                        "${PLATFORM_DB_HOST:?PLATFORM_DB_HOST is required}",
+                        "${REDIS_HOST:?REDIS_HOST is required}",
+                        "${OSS_ENDPOINT:?OSS_ENDPOINT is required}");
+        assertThat(readProjectFile("gradle/libs.versions.toml"))
+                .contains("web-plus-web = \"5.2.0\"");
+        assertThat(readProjectFile("deploy/database/V001__create_platform_schema.sql"))
+                .doesNotContain("INSERT INTO", "COPY public.", "UPDATE public.", "DELETE FROM public.");
+    }
+
     private String readProjectFile(String relativePath) throws IOException {
         Path directory = Path.of("").toAbsolutePath();
         while (directory != null && !Files.exists(directory.resolve("settings.gradle.kts"))) {

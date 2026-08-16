@@ -4,6 +4,7 @@ import com.ai.gateway.config.AiGatewayProperties;
 import com.ai.gateway.constant.FilterOrder;
 import com.ai.gateway.util.ReactiveRequestUtils;
 import com.ai.gateway.util.ReactiveResponseUtils;
+import io.github.guanxiangkai.web.plus.core.crypto.SecurityFingerprint;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -17,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -56,19 +58,19 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        String clientIp = ReactiveRequestUtils.getClientIp(exchange.getRequest());
+        String clientIp = ReactiveRequestUtils.getClientIp(exchange.getRequest(), props.getTrustedProxyIps());
         String path = exchange.getRequest().getURI().getPath();
 
         // 1. IP 黑名单检查
         if (props.getIpBlacklist().contains(clientIp)) {
-            log.warn("[限流] IP [{}] 在黑名单中，拒绝访问 {}", clientIp, path);
+            log.warn("[限流] 客户端命中 IP 黑名单: subject={}, path={}", fingerprint(clientIp), path);
             return ReactiveResponseUtils.writeError(exchange, HttpStatus.FORBIDDEN, "您的 IP 已被限制访问");
         }
 
         // 2. 登录接口防暴力破解
         if ("/auth/login".equals(path) || "/api/auth/login".equals(path)) {
-            String loginKey = props.getRateLimitKeyPrefix() + "login:" + clientIp;
-            return checkLimit(loginKey, props.getLoginMaxAttempts(), props.getLoginWindowSeconds(), clientIp, path, "登录防暴破")
+            String loginKey = props.getRateLimitKeyPrefix() + "login:" + fingerprint(clientIp);
+            return checkLimit(loginKey, props.getLoginMaxAttempts(), props.getLoginWindowSeconds(), path, "登录防暴破")
                     .flatMap(ok -> ok ? checkIpLimit(clientIp, path, exchange, chain)
                             : ReactiveResponseUtils.writeTooManyRequests(exchange, "登录尝试过于频繁，请稍后再试", props.getLoginWindowSeconds()));
         }
@@ -78,8 +80,8 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> checkIpLimit(String clientIp, String path, ServerWebExchange exchange, GatewayFilterChain chain) {
-        String key = props.getRateLimitKeyPrefix() + "ip:" + clientIp;
-        return checkLimit(key, props.getIpMaxRequests(), props.getIpWindowSeconds(), clientIp, path, "IP")
+        String key = props.getRateLimitKeyPrefix() + "ip:" + fingerprint(clientIp);
+        return checkLimit(key, props.getIpMaxRequests(), props.getIpWindowSeconds(), path, "IP")
                 .flatMap(ok -> {
                     if (!ok) {
                         return ReactiveResponseUtils.writeTooManyRequests(exchange, "请求过于频繁，请稍后再试", props.getIpWindowSeconds());
@@ -91,8 +93,8 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
                             .filter(Authentication::isAuthenticated)
                             .flatMap(auth -> {
                                 String userId = auth.getName();
-                                String userKey = props.getRateLimitKeyPrefix() + "user:" + userId;
-                                return checkLimit(userKey, props.getUserMaxRequests(), props.getUserWindowSeconds(), userId, path, "用户")
+                                String userKey = props.getRateLimitKeyPrefix() + "user:" + fingerprint(userId);
+                                return checkLimit(userKey, props.getUserMaxRequests(), props.getUserWindowSeconds(), path, "用户")
                                         .flatMap(uOk -> uOk ? chain.filter(exchange)
                                                 : ReactiveResponseUtils.writeTooManyRequests(exchange, "操作过于频繁，请稍后再试", props.getUserWindowSeconds()))
                                         .thenReturn(Boolean.TRUE);
@@ -127,20 +129,29 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
      *
      * @return Mono(true)=放行，Mono(false)=限流
      */
-    private Mono<Boolean> checkLimit(String key, int max, int windowSec, String id, String path, String dim) {
+    private Mono<Boolean> checkLimit(String key, int max, int windowSec, String path, String dimension) {
         return redisTemplate.execute(INCR_WITH_EXPIRE_SCRIPT, List.of(key), String.valueOf(windowSec))
                 .single()
                 .map(count -> {
                     if (count > max) {
-                        log.warn("[限流] {} 维度触发: id={}, path={}, count={}/{}, window={}s", dim, id, path, count, max, windowSec);
+                        log.warn("[限流] {} 维度触发: path={}, count={}/{}, window={}s",
+                                dimension, path, count, max, windowSec);
                         return false;
                     }
                     return true;
                 })
                 .onErrorResume(ex -> {
-                    log.error("[限流] Redis 计数异常，跳过本次限流: dim={}, id={}, path={}, key={}, error={}",
-                            dim, id, path, key, ex.getMessage(), ex);
-                    return Mono.just(true);
+                    log.error("[限流] Redis 计数异常: dim={}, path={}, failOpen={}, exception={}",
+                            dimension, path, props.isRateLimitFailOpen(), ex.getClass().getSimpleName());
+                    if (props.isRateLimitFailOpen()) {
+                        return Mono.just(true);
+                    }
+                    return Mono.error(new ResponseStatusException(
+                            HttpStatus.SERVICE_UNAVAILABLE, "限流服务暂不可用", ex));
                 });
+    }
+
+    private String fingerprint(String value) {
+        return SecurityFingerprint.sha256(value);
     }
 }

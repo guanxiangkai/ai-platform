@@ -64,8 +64,8 @@ class FileUploadReconciler {
                     recover(recovery);
                 }
             } catch (RuntimeException error) {
-                log.warn("文件上传恢复记录领取失败: uploadId={}, tenantId={}",
-                        candidate.uploadId(), candidate.tenantId(), error);
+                log.warn("文件上传恢复记录领取失败: uploadId={}, exception={}",
+                        candidate.uploadId(), error.getClass().getSimpleName());
             }
         } finally {
             if (previous == null) {
@@ -102,8 +102,8 @@ class FileUploadReconciler {
             } catch (RuntimeException persistenceFailure) {
                 error.addSuppressed(persistenceFailure);
             }
-            log.warn("文件上传恢复失败: uploadId={}, tenantId={}, state={}",
-                    reservation.uploadId(), reservation.tenantId(), recovery.state(), error);
+            log.warn("文件上传恢复失败: uploadId={}, state={}, exception={}",
+                    reservation.uploadId(), recovery.state(), error.getClass().getSimpleName());
         }
     }
 

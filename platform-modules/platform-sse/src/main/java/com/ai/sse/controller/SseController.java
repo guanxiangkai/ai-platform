@@ -4,6 +4,7 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import io.github.guanxiangkai.web.plus.core.model.ApiResponse;
+import io.github.guanxiangkai.web.plus.core.net.ClientIpResolver;
 import io.github.guanxiangkai.web.plus.core.util.UserClaimsCodec;
 import io.github.guanxiangkai.web.plus.error.exception.PermissionDeniedException;
 import io.github.guanxiangkai.web.plus.security.util.SecurityUtils;
@@ -27,7 +28,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.net.InetSocketAddress;
 
 /**
  * SSE 推送控制器
@@ -57,6 +57,7 @@ public class SseController {
 
     private final ISseService service;
     private final SseTicketService ticketService;
+    private final ClientIpResolver clientIpResolver;
 
     // ─────────────────────── 连接管理 ───────────────────────
 
@@ -73,7 +74,7 @@ public class SseController {
     public Mono<ApiResponse<String>> createTicket(ServerWebExchange exchange) {
         return Mono.fromCallable(() -> {
             AuthenticatedRequestUser currentUser = resolveAuthenticatedUser(exchange);
-            String clientIp = extractClientIp(exchange.getRequest());
+            String clientIp = clientIpResolver.resolve(exchange.getRequest());
             String userAgent = exchange.getRequest().getHeaders().getFirst("User-Agent");
             String ticket = ticketService.createTicket(currentUser.userId(), currentUser.tenantId(), clientIp, userAgent);
             return ApiResponse.ok(ticket);
@@ -92,13 +93,13 @@ public class SseController {
     public Flux<ServerSentEvent<String>> connect(
             @Parameter(description = "一次性连接票据", required = true) @RequestParam String ticket,
             ServerWebExchange exchange) {
-        String clientIp = extractClientIp(exchange.getRequest());
+        String clientIp = clientIpResolver.resolve(exchange.getRequest());
         String userAgent = exchange.getRequest().getHeaders().getFirst("User-Agent");
         TicketInfo info = ticketService.validateAndConsume(ticket, clientIp, userAgent);
         if (info == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "票据无效或已过期");
         }
-        log.info("SSE 连接建立: userId={}, tenantId={}, ip={}", info.userId(), info.tenantId(), clientIp);
+        log.info("SSE 票据验证通过并准备建立连接");
         return service.connect(info.userId(), info.tenantId());
     }
 
@@ -160,24 +161,6 @@ public class SseController {
 
     // ─────────────────────── 私有方法 ───────────────────────
 
-    /**
-     * 提取客户端真实 IP（优先 X-Forwarded-For → X-Real-IP → RemoteAddress）
-     */
-    private String extractClientIp(ServerHttpRequest request) {
-        // 网关转发时设置的真实 IP
-        String ip = request.getHeaders().getFirst("X-Forwarded-For");
-        if (StringUtils.hasText(ip) && !"unknown".equalsIgnoreCase(ip)) {
-            // X-Forwarded-For 可能包含多个 IP，取第一个
-            return ip.contains(",") ? ip.split(",")[0].trim() : ip.trim();
-        }
-        ip = request.getHeaders().getFirst("X-Real-IP");
-        if (StringUtils.hasText(ip) && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.trim();
-        }
-        InetSocketAddress remoteAddress = request.getRemoteAddress();
-        return remoteAddress != null ? remoteAddress.getAddress().getHostAddress() : "unknown";
-    }
-
     private AuthenticatedRequestUser resolveAuthenticatedUser(ServerWebExchange exchange) {
         ServerHttpRequest request = exchange.getRequest();
         String userId = firstNonBlank(
@@ -204,7 +187,7 @@ public class SseController {
             Object superAdmin = claims.get("superAdmin");
             return superAdmin != null && Boolean.parseBoolean(superAdmin.toString());
         } catch (Exception e) {
-            log.warn("解析 X-User-Claims 失败: {}", e.getMessage());
+            log.warn("解析 X-User-Claims 失败: exception={}", e.getClass().getSimpleName());
             return false;
         }
     }

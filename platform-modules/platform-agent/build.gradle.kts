@@ -1,11 +1,7 @@
 dependencies {
-    implementation(libs.bundles.platform.service)
-    implementation(libs.web.plus.log)
-    implementation(libs.spring.boot.starter.webclient)
-    implementation(libs.spring.boot.starter.validation)
+    implementation(libs.bundles.platform.agent)
     runtimeOnly(libs.postgresql)
-    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
-    testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation(libs.bundles.postgresql.integration.testing)
     implementation(project(":platform-api:platform-agent-api"))
     annotationProcessor(libs.spring.boot.configuration.processor)
 }

@@ -6,7 +6,7 @@ import java.io.Serializable;
 /**
  * 字典 DTO（API 契约层）
  * <p>
- * 由 ai-system-api 统一定义，供所有消费方共享。
+ * 由 platform-system-api 统一定义，供所有消费方共享。
  * </p>
  *
  * @author guanxiangkai

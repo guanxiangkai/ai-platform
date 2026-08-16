@@ -44,15 +44,16 @@ public class OssLogHandlerImpl implements OssLogHandler {
         }
         String tenantId = entity.getTenantId();
         if (!StringUtils.hasText(tenantId)) {
-            log.error("[OssLogHandler] 上传日志缺少租户标识，已拒绝持久化: file={}", entity.getOriginalName());
+            log.error("[OssLogHandler] 上传日志缺少租户标识，已拒绝持久化");
             return;
         }
         try {
             TenantExecutionScope.run(tenantId.trim(), () -> ossLogService.createEntity(entity));
-            log.debug("[OssLogHandler] 上传日志保存成功: file={}, size={}, status={}",
-                    entity.getOriginalName(), entity.getFileSize(), entity.getStatus());
+            log.debug("[OssLogHandler] 上传日志保存成功: size={}, status={}",
+                    entity.getFileSize(), entity.getStatus());
         } catch (Exception e) {
-            log.error("[OssLogHandler] 保存上传日志失败: file={}", entity.getOriginalName(), e);
+            log.error("[OssLogHandler] 保存上传日志失败: exception={}",
+                    e.getClass().getSimpleName());
         }
     }
 }

@@ -24,6 +24,7 @@ import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.stream.StreamMessageListenerContainer;
 
 import java.util.List;
@@ -146,8 +147,8 @@ public class RedisOperationLogConsumerConfig {
             TenantExecutionScope.run(streamRecord.tenantId(), () -> service.createEntity(toEntity(streamRecord)));
             acknowledge(record);
         } catch (Exception e) {
-            log.error("[RedisOperationLogConsumer] 保存操作日志失败，记录保留在待确认队列: module={}, user={}",
-                    values.get("module"), values.get("username"), e);
+            log.error("[RedisOperationLogConsumer] 保存操作日志失败，记录保留在待确认队列: module={}, exception={}",
+                    values.get("module"), e.getClass().getSimpleName());
         }
     }
 
@@ -160,8 +161,8 @@ public class RedisOperationLogConsumerConfig {
      * @param exception 字段校验失败原因
      */
     private void acknowledgeInvalidRecord(MapRecord<String, String, String> record, IllegalArgumentException exception) {
-        log.warn("[RedisOperationLogConsumer] 丢弃不符合当前操作日志 Stream 契约的记录: id={}, reason={}",
-                record.getId(), exception.getMessage());
+        log.warn("[RedisOperationLogConsumer] 丢弃不符合当前操作日志 Stream 契约的记录: id={}, exception={}",
+                record.getId(), exception.getClass().getSimpleName());
         acknowledge(record);
     }
 
@@ -218,21 +219,26 @@ public class RedisOperationLogConsumerConfig {
     /** 重试当前消费者尚未确认的操作日志，服务重启后也会继续处理。 */
     void recoverPendingRecords() {
         try {
-            List<MapRecord<String, Object, Object>> pending = redisTemplate.opsForStream().read(
+            StreamOperations<String, String, String> streamOperations = redisTemplate.opsForStream();
+            StreamOffset<String> pendingOffset = StreamOffset.create(
+                    OperationLogStreamCodec.STREAM_KEY,
+                    ReadOffset.from("0")
+            );
+            @SuppressWarnings("unchecked")
+            List<MapRecord<String, String, String>> pending = streamOperations.read(
                     Consumer.from(OperationLogStreamCodec.CONSUMER_GROUP, OperationLogStreamCodec.CONSUMER_NAME),
                     StreamReadOptions.empty().count(properties.getPendingBatchSize()),
-                    StreamOffset.create(OperationLogStreamCodec.STREAM_KEY, ReadOffset.from("0"))
+                    pendingOffset
             );
             if (pending == null) {
                 return;
             }
-            for (MapRecord<String, Object, Object> record : pending) {
-                Map<String, String> values = new java.util.LinkedHashMap<>();
-                record.getValue().forEach((key, value) -> values.put(String.valueOf(key), String.valueOf(value)));
-                consume(MapRecord.create(record.getStream(), values).withId(record.getId()));
+            for (MapRecord<String, String, String> record : pending) {
+                consume(record);
             }
         } catch (Exception exception) {
-            log.error("[RedisOperationLogConsumer] 重试待确认操作日志失败", exception);
+            log.error("[RedisOperationLogConsumer] 重试待确认操作日志失败: exception={}",
+                    exception.getClass().getSimpleName());
         }
     }
 

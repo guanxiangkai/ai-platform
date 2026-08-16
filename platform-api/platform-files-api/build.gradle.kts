@@ -1,5 +1,6 @@
 dependencies {
-    implementation(libs.web.plus.security)
-    implementation(libs.spring.boot.starter.validation)
+    api(libs.bundles.http.contract)
+    implementation(libs.bundles.http.client.runtime)
+    implementation(libs.bundles.platform.api.files)
     implementation(project(":platform-api:platform-core-api"))
 }

@@ -34,4 +34,17 @@ public record LoginResponse(
 ) implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
+
+    /**
+     * 返回不包含令牌和用户身份详情的诊断摘要。
+     *
+     * @return 已脱敏的登录响应摘要
+     */
+    @Override
+    public String toString() {
+        return "LoginResponse[tokens=<redacted>, tokenType=" + tokenType
+                + ", expiresIn=" + expiresIn
+                + ", identity=<redacted>, superAdmin=" + superAdmin
+                + ", authorization=<redacted>]";
+    }
 }

@@ -245,9 +245,9 @@ public class SchedulerTaskService {
         } catch (RuntimeException exception) {
             task.setSyncState(SchedulerSyncState.FAILED);
             task.setLastSyncTime(LocalDateTime.now());
-            task.setLastSyncMessage(truncate(safeMessage(exception), SchedulerTask.LAST_SYNC_MESSAGE_MAX_LENGTH));
-            log.warn("调度任务同步失败，taskId={}, applicationCode={}: {}",
-                    task.getId(), task.getApplicationCode(), safeMessage(exception));
+            task.setLastSyncMessage("调度引擎同步失败");
+            log.warn("调度任务同步失败: taskId={}, applicationCode={}, exception={}",
+                    task.getId(), task.getApplicationCode(), exception.getClass().getSimpleName());
         }
         repository.saveAndFlush(task);
     }
@@ -363,14 +363,6 @@ public class SchedulerTaskService {
             throw new BizException(label + "必须在 " + min + " 到 " + max + " 之间");
         }
         return resolved;
-    }
-
-    private String safeMessage(RuntimeException exception) {
-        return StringUtils.hasText(exception.getMessage()) ? exception.getMessage() : "调度引擎调用失败";
-    }
-
-    private String truncate(String value, int length) {
-        return value.length() <= length ? value : value.substring(0, length);
     }
 
     private Instant instant(Long epochMillis) {

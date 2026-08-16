@@ -44,7 +44,8 @@ public class SysDictProvider implements DictProvider {
                     .map(vo -> new DictItem(vo.getItemValue(), vo.getItemLabel()))
                     .toList();
         } catch (Exception e) {
-            log.error("[SysDictProvider] 加载字典项失败: dictCode={}", code, e);
+            log.error("[SysDictProvider] 加载字典项失败: dictCode={}, exception={}",
+                    code, e.getClass().getSimpleName());
             return Collections.emptyList();
         }
     }
