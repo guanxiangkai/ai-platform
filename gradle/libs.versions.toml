@@ -6,8 +6,8 @@
 [versions]
 
 # ─────────────────────────── Spring 体系 ───────────────────────────
-spring-boot = "4.1.0"          # Spring Boot 4.1 稳定线；具体 Framework / Security / Data 版本由官方 BOM 管理，升级需重点验证网关、JPA、HTTP 客户端默认行为
-spring-cloud = "2025.1.2"       # Spring Cloud 2025.1.2（Oakwood，官方引入 Spring Boot 4.1.0 兼容性）
+spring-boot = "4.1.1"          # Spring Boot 4.1 稳定线；具体 Framework / Security / Data 版本由官方 BOM 管理，升级需重点验证网关、JPA、HTTP 客户端默认行为
+spring-cloud = "2025.1.3"       # Spring Cloud 2025.1.2（Oakwood，官方引入 Spring Boot 4.1.0 兼容性）
 spring-cloud-alibaba = "2025.1.0.0"     # Spring Cloud Alibaba 全家桶（Nacos / Sentinel / Seata 等）
 aspectj = "1.9.25.1"
 
