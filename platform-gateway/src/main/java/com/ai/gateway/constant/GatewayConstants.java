@@ -16,7 +16,6 @@ public final class GatewayConstants {
      */
     public static final class HeaderConstants {
 
-        public static final String TRACE_ID = "X-Trace-Id";
         public static final List<String> CLIENT_IP_HEADERS = List.of(
                 "X-Forwarded-For",
                 "X-Real-IP",
@@ -30,14 +29,4 @@ public final class GatewayConstants {
         }
     }
 
-    /**
-     * Exchange 属性常量
-     */
-    public static final class ExchangeAttributeConstants {
-
-        public static final String START_TIME = "gateway_start_time";
-
-        private ExchangeAttributeConstants() {
-        }
-    }
 }

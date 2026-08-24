@@ -1,0 +1,29 @@
+spring:
+  task:
+    execution:
+      # 非虚拟线程或由 Spring Boot 创建的执行器也必须传播 Observation、MDC 与请求上下文。
+      propagate-context: true
+
+management:
+  tracing:
+    propagation:
+      type: W3C
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+    export:
+      otlp:
+        # 没有配置 Collector 时只保留本地 Span、W3C 传播和日志关联，避免向 localhost 重试。
+        enabled: ${OTEL_TRACING_EXPORT_ENABLED:false}
+  logging:
+    export:
+      otlp:
+        enabled: ${OTEL_LOGGING_EXPORT_ENABLED:false}
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTEL_METRICS_EXPORT_ENABLED:false}
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  include-application-name: false

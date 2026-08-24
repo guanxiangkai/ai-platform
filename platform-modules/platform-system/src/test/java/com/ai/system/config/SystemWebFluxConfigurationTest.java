@@ -1,10 +1,14 @@
 package com.ai.system.config;
 
+import io.github.guanxiangkai.web.plus.core.context.RequestContext;
+import io.github.guanxiangkai.web.plus.core.context.RequestContextHolder;
+import io.github.guanxiangkai.web.plus.core.config.ContextPropagationAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.core.task.VirtualThreadTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,14 +26,26 @@ class SystemWebFluxConfigurationTest {
 
     @Test
     void blockingControllerMethodsShouldUseVirtualThreads() throws Exception {
-        AsyncTaskExecutor executor = SystemWebFluxConfiguration.platformSystemBlockingExecutor();
+        ContextPropagationAutoConfiguration propagation = new ContextPropagationAutoConfiguration();
+        var accessor = propagation.requestContextThreadLocalAccessor();
+        propagation.requestContextAccessorRegistrar(accessor).afterSingletonsInstantiated();
+        AsyncTaskExecutor executor = SystemWebFluxConfiguration.platformSystemBlockingExecutor(
+                new ContextPropagatingTaskDecorator());
         SystemWebFluxConfiguration configuration = new SystemWebFluxConfiguration(executor);
         InspectableBlockingExecutionConfigurer configurer = new InspectableBlockingExecutionConfigurer();
 
         configuration.configureBlockingExecution(configurer);
 
-        assertThat(configurer.executor()).isSameAs(executor).isInstanceOf(VirtualThreadTaskExecutor.class);
+        assertThat(configurer.executor()).isSameAs(executor).isInstanceOf(SimpleAsyncTaskExecutor.class);
         assertThat(executor.submit(() -> Thread.currentThread().isVirtual()).get()).isTrue();
+
+        RequestContextHolder.set(new RequestContext(
+                "trace-system", "/system", "GET", null, null, System.currentTimeMillis()));
+        try {
+            assertThat(executor.submit(RequestContextHolder::getTraceId).get()).isEqualTo("trace-system");
+        } finally {
+            RequestContextHolder.clear();
+        }
     }
 
     @Test

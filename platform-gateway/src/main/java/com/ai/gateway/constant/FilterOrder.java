@@ -12,7 +12,7 @@ package com.ai.gateway.constant;
  * └──────────────────────────────────────────────────────────────────────────┘
  *                                    ↓
  * ┌─────────────────────── Gateway GlobalFilter 链 ──────────────────────────┐
- * │  RequestLogFilter(-200)       日志 &amp; traceId                             │
+ * │  RequestLogFilter(-200)       请求日志                                     │
  * │  RateLimitFilter(-150)        限流 &amp; 黑名单                              │
  * │  SecurityFilter(-120)         XSS / SQL 注入检测                          │
  * │  TenantRouteGuard(-110)       校验业务路径租户与 JWT 租户一致               │
@@ -27,7 +27,7 @@ package com.ai.gateway.constant;
 public final class FilterOrder {
 
     /**
-     * 请求日志 & 链路追踪
+     * 请求日志
      */
     public static final int REQUEST_LOG = -200;
     /**

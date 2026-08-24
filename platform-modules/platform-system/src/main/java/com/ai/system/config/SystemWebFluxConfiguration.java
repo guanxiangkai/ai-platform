@@ -1,10 +1,12 @@
 package com.ai.system.config;
 
+import io.github.guanxiangkai.web.plus.core.config.ContextPropagationAutoConfiguration;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.core.task.VirtualThreadTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.TaskDecorator;
 import org.springframework.web.reactive.config.BlockingExecutionConfigurer;
 import org.springframework.web.reactive.config.WebFluxConfigurer;
 
@@ -34,8 +36,13 @@ public class SystemWebFluxConfiguration implements WebFluxConfigurer {
 
     /** 创建按请求分配虚拟线程的阻塞控制器执行器。 */
     @Bean(BLOCKING_EXECUTOR_BEAN_NAME)
-    public static AsyncTaskExecutor platformSystemBlockingExecutor() {
-        return new VirtualThreadTaskExecutor(BLOCKING_THREAD_PREFIX);
+    public static AsyncTaskExecutor platformSystemBlockingExecutor(
+            @Qualifier(ContextPropagationAutoConfiguration.TASK_DECORATOR_BEAN_NAME)
+            TaskDecorator taskDecorator) {
+        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor(BLOCKING_THREAD_PREFIX);
+        executor.setVirtualThreads(true);
+        executor.setTaskDecorator(taskDecorator);
+        return executor;
     }
 
     @Override
