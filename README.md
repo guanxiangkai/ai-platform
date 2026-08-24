@@ -20,10 +20,10 @@ AI Platform 是面向通用 AI 应用的多租户基础后端，提供统一网�
 ## 技术基线
 
 - Oracle GraalVM 25.0.4
-- Spring Boot 4.1.0
+- Spring Boot 4.1.1
 - Spring Cloud 2025.1.2
 - Spring Cloud Alibaba 2025.1.0.0
-- Gradle 9.6.1
+- Gradle 9.7.1
 - Jackson 3
 - AI Plus 公共 Maven Central 制品；联合开发可通过 `AI_PLUS_HOME` 使用当前源码 composite build
 
@@ -63,6 +63,10 @@ Linux CI 会同时检出 AI Plus 当前 `main`，以源码 composite build 验�
 ```bash
 AI_PLUS_HOME=/path/to/ai-plus ./gradlew buildAll --no-daemon --stacktrace
 ```
+
+Gradle、Version Catalog、GitHub Actions 与 Docker 镜像由 `.github/dependabot.yml`
+每周检查并分组提交更新；所有更新仍需同时通过 AI Platform 与 AI Plus 当前源码构建，
+不能绕过质量门禁直接进入 `main`。
 
 PostgreSQL 并发约束测试使用 Testcontainers 和测试类内的最小临时 DDL，不读取或分发部署数据库脚本。
 

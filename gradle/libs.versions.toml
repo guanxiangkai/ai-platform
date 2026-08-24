@@ -6,8 +6,8 @@
 [versions]
 
 # ─────────────────────────── Spring 体系 ───────────────────────────
-spring-boot = "4.1.0"          # Spring Boot 4.1 稳定线；具体 Framework / Security / Data 版本由官方 BOM 管理，升级需重点验证网关、JPA、HTTP 客户端默认行为
-spring-cloud = "2025.1.2"       # Spring Cloud 2025.1.2（Oakwood，官方引入 Spring Boot 4.1.0 兼容性）
+spring-boot = "4.1.1"          # Spring Boot 4.1.1 稳定补丁；具体 Framework / Security / Data 版本由官方 BOM 管理，升级需重点验证网关、JPA、HTTP 客户端默认行为
+spring-cloud = "2025.1.2"       # Spring Cloud 2025.1.2（Oakwood，当前最新稳定发布列车，兼容 Spring Boot 4.1.x）
 spring-cloud-alibaba = "2025.1.0.0"     # Spring Cloud Alibaba 全家桶（Nacos / Sentinel / Seata 等）
 aspectj = "1.9.25.1"
 
@@ -31,31 +31,31 @@ nimbus-jose-jwt = "10.9.1"   # Nimbus JOSE + JWT（ai-auth 直接使用 SignedJW
 jjwt = "0.13.0"              # JJWT（Web Plus Security JWT 签发与校验；升级需验证 Web Plus JWT 兼容性）
 
 # ─────────────────────── 对象映射 ────────────────────────────
-mapstruct-plus = "1.5.2"          # MapStruct Plus 增强（@AutoMapper 自动生成转换器）
+mapstruct-plus = "1.5.1"          # MapStruct Plus 最新已发布稳定版（@AutoMapper 自动生成转换器）
 lombok-mapstruct-binding = "0.2.0" # 确保 Lombok 在 MapStruct 之前运行的绑定处理器
 
 # ─────────────────────────── 测试 ────────────────────────────────
-junit = "6.1.3"          # JUnit 6
+junit = "6.1.2"          # JUnit 6.1 最新已发布稳定补丁
 
 # ─────────────────────────── Gradle 插件 ─────────────────────────
 lombok-plugin = "9.5.0"          # Lombok Gradle 插件
 
 # ─────────────────────────── AI Plus 独立模块版本 ───────────────────────────
 # 已发布版本不可覆盖。每个 Maven 模块独立维护版本，消费方只升级实际需要的模块。
-web-plus-core = "3.2.0"
-web-plus-error = "2.0.0"
-web-plus-web = "5.1.1"
-web-plus-security = "1.0.3"
-web-plus-protection = "2.0.0"
-web-plus-log = "2.0.0"
-web-plus-mq = "1.1.0"
-web-plus-dict = "1.0.2"
-jpa-plus-core = "1.0.1"
-jpa-plus-field = "1.0.1"
-jpa-plus-interceptor = "1.0.1"
-jpa-plus-audit = "1.0.2"
-jpa-plus-starter = "2.1.0"
-redis-plus-starter = "2.0.1"
+web-plus-core = "3.2.1"
+web-plus-error = "2.0.1"
+web-plus-web = "5.1.2"
+web-plus-security = "1.0.4"
+web-plus-protection = "2.0.1"
+web-plus-log = "2.0.1"
+web-plus-mq = "1.1.1"
+web-plus-dict = "1.0.3"
+jpa-plus-core = "1.0.2"
+jpa-plus-field = "1.0.2"
+jpa-plus-interceptor = "1.0.2"
+jpa-plus-audit = "1.0.3"
+jpa-plus-starter = "2.1.1"
+redis-plus-starter = "2.0.2"
 
 pinyin4j = "2.5.1"                # Pinyin4j 中文拼音引擎（Maven Central 可解析，供 Hutool PinyinUtil 自动发现使用）
 
@@ -65,11 +65,7 @@ fastexcel = "1.3.0"               # FastExcel 导入导出（Web Plus 与消费�
 poi = "5.5.1"                     # Apache POI（Word 模板处理：doc/docx）
 
 # ─────────────────────────── OSS（S3 兼容存储）────────────────────
-aws-sdk = "2.51.3"          # AWS SDK v2（S3 兼容客户端，对接 SeaweedFS / MinIO 等）
-
-# ─────────────────────────── Reactor ────────────────────────────
-micrometer-context-propagation = "1.2.1"  # Micrometer Context Propagation（ThreadLocal 跨 Reactor 线程传播）
-
+aws-sdk = "2.53.1"          # AWS SDK v2 最新稳定发布（S3 兼容客户端，对接 SeaweedFS / MinIO 等）
 
 # ╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
 # ║                                  libraries —— 依赖坐标定义区                                       ║
@@ -247,7 +243,7 @@ spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-
 
 # ═══════════════════════════ Reactor 上下文传播 ═══════════════════════════
 # 让 ThreadLocal 自动跨 Reactor 线程传播（publishOn / subscribeOn）
-micrometer-context-propagation = { group = "io.micrometer", name = "context-propagation", version.ref = "micrometer-context-propagation" }
+micrometer-context-propagation = { group = "io.micrometer", name = "context-propagation" }
 # Spring Cloud Stream 函数式消息 Observation 所需的 Reactor Micrometer 集成。
 reactor-core-micrometer = { group = "io.projectreactor", name = "reactor-core-micrometer" }
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
