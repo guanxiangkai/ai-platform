@@ -19,6 +19,7 @@ spring:
         group: ${NACOS_CONFIG_GROUP:DEFAULT_GROUP}
   config:
     import:
+      - classpath:platform-observability.yml
       - nacos:application.yml?group=${NACOS_CONFIG_GROUP:DEFAULT_GROUP}
       - nacos:${spring.application.name}.yml?group=${NACOS_CONFIG_GROUP:DEFAULT_GROUP}
 

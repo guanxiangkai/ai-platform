@@ -20,5 +20,6 @@ spring:
         file-extension: yml
   config:
     import:
+      - classpath:platform-observability.yml
       - nacos:application.yml?group=${spring.cloud.nacos.config.group}
       - nacos:${spring.application.name}.yml?group=${spring.cloud.nacos.config.group}

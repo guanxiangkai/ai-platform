@@ -42,13 +42,13 @@ lombok-plugin = "9.5.0"          # Lombok Gradle 插件
 
 # ─────────────────────────── AI Plus 独立模块版本 ───────────────────────────
 # 已发布版本不可覆盖。每个 Maven 模块独立维护版本，消费方只升级实际需要的模块。
-web-plus-core = "3.1.0"
+web-plus-core = "3.2.0"
 web-plus-error = "2.0.0"
-web-plus-web = "5.1.0"
-web-plus-security = "1.0.2"
+web-plus-web = "5.1.1"
+web-plus-security = "1.0.3"
 web-plus-protection = "2.0.0"
-web-plus-log = "1.1.0"
-web-plus-mq = "1.0.1"
+web-plus-log = "2.0.0"
+web-plus-mq = "1.1.0"
 web-plus-dict = "1.0.2"
 jpa-plus-core = "1.0.1"
 jpa-plus-field = "1.0.1"
@@ -84,6 +84,8 @@ spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-
 
 # 健康检查 & 监控端点
 spring-boot-starter-actuator = { group = "org.springframework.boot", name = "spring-boot-starter-actuator" }
+# OpenTelemetry SDK、Micrometer Tracing 桥接与 OTLP 导出器；导出默认由共享配置关闭，部署环境显式启用。
+spring-boot-starter-opentelemetry = { group = "org.springframework.boot", name = "spring-boot-starter-opentelemetry" }
 
 # OAuth2 Resource Server（内含 nimbus-jose-jwt，用于 RSA/JWKS 签名与验证）
 spring-boot-starter-oauth2-resource-server = { group = "org.springframework.boot", name = "spring-boot-starter-oauth2-resource-server" }
@@ -246,6 +248,8 @@ spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-
 # ═══════════════════════════ Reactor 上下文传播 ═══════════════════════════
 # 让 ThreadLocal 自动跨 Reactor 线程传播（publishOn / subscribeOn）
 micrometer-context-propagation = { group = "io.micrometer", name = "context-propagation", version.ref = "micrometer-context-propagation" }
+# Spring Cloud Stream 函数式消息 Observation 所需的 Reactor Micrometer 集成。
+reactor-core-micrometer = { group = "io.projectreactor", name = "reactor-core-micrometer" }
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit" }
 
@@ -263,12 +267,14 @@ junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform
 jjwt-runtime = ["jjwt-impl", "jjwt-gson"]
 
 # ─────────────────────── cloud-service（微服务公共依赖）────────────
-# 所有共享平台服务的 Nacos 注册、配置和负载均衡
+# 所有共享平台服务的 Nacos 注册、配置、负载均衡、Actuator 与 OpenTelemetry 观测基础设施
 cloud-service = [
     "spring-cloud-alibaba-starter-nacos-discovery",
     "spring-cloud-alibaba-starter-nacos-config",
     "spring-cloud-starter-loadbalancer",
     "spring-boot-starter-actuator",
+    "spring-boot-starter-opentelemetry",
+    "reactor-core-micrometer",
 ]
 
 # ─────────────────────── http-interface（声明式 HTTP 客户端契约层）──
@@ -306,8 +312,9 @@ ai-sse = [
 
 # ─────────────────────── ai-gateway（API 网关 · 纯响应式）─────────
 # ⚠️ Gateway 内含 WebFlux + Netty，绝对不可引入 starter-web！
-#   web-plus-core      → 统一响应、用户声明与可信转发配置
+#   web-plus-core      → 统一响应、用户声明、上下文传播与可信转发配置
 #   web-plus-security  → 网关安全处理器与认证异常处理
+#   web-plus-log       → TraceId 入站/响应头、WebClient 透传与访问日志
 ai-gateway = [
     "spring-cloud-starter-gateway-server-webflux",
     "spring-cloud-starter-loadbalancer",
@@ -315,9 +322,12 @@ ai-gateway = [
     "spring-cloud-alibaba-starter-nacos-config",
     "spring-boot-starter-data-redis-reactive",
     "spring-boot-starter-actuator",
+    "spring-boot-starter-opentelemetry",
+    "reactor-core-micrometer",
     "spring-boot-starter-oauth2-resource-server",
     "web-plus-core",
     "web-plus-security",
+    "web-plus-log",
 ]
 
 # ─────────────────────── ai-auth（认证服务）─────────────────────────
@@ -335,6 +345,8 @@ ai-auth = [
     "spring-cloud-alibaba-starter-nacos-config",
     "spring-cloud-starter-loadbalancer",
     "spring-boot-starter-actuator",
+    "spring-boot-starter-opentelemetry",
+    "reactor-core-micrometer",
     "spring-boot-starter-data-redis",
     "spring-boot-starter-data-jpa",
     "web-plus-core",
@@ -346,10 +358,11 @@ ai-auth = [
 ]
 
 # ─────────────────────── platform-service（通用领域服务）────────────
-# Agent、文件和调度服务共享的 WebFlux、JPA、OpenAPI 与平台基础能力；模块只追加自身专属依赖。
+# Agent、文件和调度服务共享的 WebFlux、JPA、OpenAPI、TraceId 与平台基础能力；模块只追加自身专属依赖。
 platform-service = [
     "web-plus-core",
     "web-plus-error",
+    "web-plus-log",
     "web-plus-security",
     "spring-boot-starter-webflux",
     "spring-boot-starter-data-jpa",

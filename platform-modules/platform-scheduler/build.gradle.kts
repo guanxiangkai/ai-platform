@@ -1,6 +1,5 @@
 dependencies {
     implementation(libs.bundles.platform.service)
-    implementation(libs.web.plus.log)
     implementation(libs.spring.boot.starter.validation)
     runtimeOnly(libs.postgresql)
     annotationProcessor(libs.spring.boot.configuration.processor)

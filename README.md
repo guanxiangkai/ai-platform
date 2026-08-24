@@ -35,6 +35,27 @@ AI Platform 是面向通用 AI 应用的多租户基础后端，提供统一网�
 
 `docker/docker-compose.yml` 只是无真实值的参数化编排示例。生产配置、数据库结构与数据迁移由使用方在独立私有交付物中维护，不属于本公开仓库。
 
+## 全链路可观测性
+
+所有平台服务统一引入 Web Plus TraceId 能力和 Spring Boot OpenTelemetry：
+
+- HTTP 入站、网关短路响应和正常响应都会返回 `X-Trace-Id`；该值与活动 Micrometer Span 的 TraceId 一致。
+- 服务间调用必须使用 Spring Boot 自动配置的 `WebClient.Builder`，由框架同时传播 W3C `traceparent` 与 `X-Trace-Id`。
+- Spring Cloud Stream 消息使用标准 Observation，并在消息头恢复 Web Plus 请求上下文；`@Async`、虚拟线程和 Reactor 调度器共享同一上下文传播机制。
+- 控制台日志统一输出应用名、TraceId 和 SpanId。OTLP Trace、Log、Metric 导出默认关闭，避免未配置 Collector 时持续重试。
+
+部署环境按需配置：
+
+| 环境变量 | 用途 | 默认值 |
+| --- | --- | --- |
+| `TRACING_SAMPLING_PROBABILITY` | Trace 采样概率，范围 0.0～1.0 | `0.1` |
+| `OTEL_TRACING_EXPORT_ENABLED` | 启用 OTLP Trace 导出 | `false` |
+| `OTEL_LOGGING_EXPORT_ENABLED` | 启用 OTLP Log 导出 | `false` |
+| `OTEL_METRICS_EXPORT_ENABLED` | 启用 OTLP Metric 导出 | `false` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry Collector 根地址 | 无 |
+
+启用任一导出前必须先提供可达的 Collector 地址；认证 Header、证书和后端凭据继续由部署环境注入。
+
 ## 构建与验证
 
 Linux CI 会同时检出 AI Plus 当前 `main`，以源码 composite build 验证平台实际使用的是 AI Plus 的最新公开基线：
