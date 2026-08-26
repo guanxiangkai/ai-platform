@@ -1,6 +1,7 @@
 package com.ai.agent.service;
 
 import com.ai.agent.config.AgentAsrProperties;
+import com.ai.agent.config.AsrUpstreamProtocol;
 import com.ai.agent.domain.AgentVoiceRecognitionState;
 import com.ai.agent.domain.dto.AsrDTO;
 import com.ai.agent.domain.entity.AgentVoiceRecord;
@@ -23,8 +24,10 @@ import reactor.core.scheduler.Schedulers;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -37,6 +40,25 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class AsrService {
+    private static final String DASHSCOPE_SSE_HEADER = "X-DashScope-SSE";
+    private static final int DASHSCOPE_DATA_URL_MAX_BYTES = 10_000_000;
+    private static final Map<String, String> DASHSCOPE_FORMATS = Map.ofEntries(
+            Map.entry("audio/aac", "aac"),
+            Map.entry("audio/flac", "flac"),
+            Map.entry("audio/m4a", "m4a"),
+            Map.entry("audio/mp4", "mp4"),
+            Map.entry("audio/mpeg", "mp3"),
+            Map.entry("audio/ogg", "ogg"),
+            Map.entry("audio/wav", "wav"),
+            Map.entry("audio/webm", "webm"),
+            Map.entry("audio/x-flac", "flac"),
+            Map.entry("audio/x-m4a", "m4a"),
+            Map.entry("audio/x-wav", "wav"),
+            Map.entry("video/webm", "webm"));
+    private static final Set<String> DASHSCOPE_LANGUAGE_HINTS = Set.of(
+            "zh", "en", "ja", "ko", "vi", "th", "id", "ms", "tl", "hi",
+            "ar", "fr", "de", "es", "pt", "ru", "it", "nl", "sv", "da",
+            "fi", "no", "el", "pl", "cs", "hu", "ro", "bg", "hr", "sk");
     private static final Set<String> SUPPORTED_CONTENT_TYPES = Set.of(
             "audio/aac", "audio/flac", "audio/m4a", "audio/mp4", "audio/mpeg",
             "audio/ogg", "audio/wav", "audio/webm", "audio/x-flac", "audio/x-m4a",
@@ -92,6 +114,9 @@ public class AsrService {
     }
 
     private Mono<String> upstream(byte[] bytes, String filename, String type, String language) {
+        if (properties.getSpeechToTextProtocol() == AsrUpstreamProtocol.DASHSCOPE_MULTIMODAL) {
+            return dashScopeUpstream(bytes, type, language);
+        }
         MultipartBodyBuilder body = new MultipartBodyBuilder();
         body.part("file", bytes).filename(safeFilename(filename)).contentType(mediaType(type));
         if (StringUtils.hasText(language)) body.part("language", language);
@@ -102,6 +127,62 @@ public class AsrService {
         return request.contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(BodyInserters.fromMultipartData(body.build())).retrieve().bodyToMono(String.class)
                 .timeout(properties.getSpeechToTextTimeout());
+    }
+
+    private Mono<String> dashScopeUpstream(byte[] bytes, String type, String language) {
+        ObjectNode body = dashScopeBody(objectMapper, properties.getSpeechToTextModel(), bytes, type, language);
+        WebClient.RequestBodySpec request = webClientBuilder.build().post().uri(properties.getSpeechToTextUrl());
+        if (StringUtils.hasText(properties.getSpeechToTextApiKey())) {
+            request.header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getSpeechToTextApiKey());
+        }
+        return request.header(DASHSCOPE_SSE_HEADER, "disable")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body).retrieve().bodyToMono(String.class)
+                .timeout(properties.getSpeechToTextTimeout());
+    }
+
+    /** 构造百炼 Qwen Audio 同步识别请求，供协议回归测试复用。 */
+    static ObjectNode dashScopeBody(
+            ObjectMapper mapper, String model, byte[] bytes, String type, String language) {
+        ObjectNode body = mapper.createObjectNode();
+        body.put("model", StringUtils.hasText(model) ? model : "qwen-audio-3.0-asr-flash");
+        ObjectNode input = body.putObject("input");
+        ObjectNode message = input.putArray("messages").addObject();
+        message.put("role", "user");
+        ObjectNode audio = message.putArray("content").addObject();
+        audio.put("type", "input_audio");
+        audio.putObject("input_audio").put("data", dashScopeDataUrl(bytes, type));
+        ObjectNode parameters = body.putObject("parameters");
+        parameters.put("format", dashScopeFormat(type));
+        String languageHint = dashScopeLanguageHint(language);
+        if (languageHint != null) {
+            parameters.putArray("language_hints").add(languageHint);
+        }
+        return body;
+    }
+
+    /** 将当前允许的 MIME 类型映射为百炼支持的音频格式。 */
+    static String dashScopeFormat(String type) {
+        String format = DASHSCOPE_FORMATS.get(type);
+        if (format == null) throw CoreBizException.invalid("DashScope ASR 不支持该语音文件类型");
+        return format;
+    }
+
+    /** 将语言区域标识映射为百炼语言提示；无法可靠映射时不发送提示。 */
+    static String dashScopeLanguageHint(String language) {
+        if (!StringUtils.hasText(language) || "auto".equalsIgnoreCase(language.trim())) return null;
+        String base = language.trim().toLowerCase(Locale.ROOT).split("-", 2)[0];
+        return DASHSCOPE_LANGUAGE_HINTS.contains(base) ? base : null;
+    }
+
+    /** 构造并校验百炼要求的音频 Data URL，避免超出 10,000,000 字节限制。 */
+    static String dashScopeDataUrl(byte[] bytes, String type) {
+        String prefix = "data:" + type + ";base64,";
+        long encodedBytes = 4L * ((bytes.length + 2L) / 3L);
+        if (prefix.length() + encodedBytes > DASHSCOPE_DATA_URL_MAX_BYTES) {
+            throw CoreBizException.invalid("语音文件超过允许大小");
+        }
+        return prefix + java.util.Base64.getEncoder().encodeToString(bytes);
     }
 
     private Mono<AgentVoiceRecord> createRecord(
@@ -148,10 +229,14 @@ public class AsrService {
         }
     }
 
-    private String extractText(JsonNode value) {
+    /** 从 ASR 上游标准 JSON 响应中递归提取转写文本。 */
+    static String extractText(JsonNode value) {
         if (value == null || value.isNull()) return "";
-        String scalar = value.stringValue();
-        if (scalar != null) return scalar.trim();
+        if (value.isTextual()) {
+            String text = value.stringValue();
+            return text == null ? "" : text.trim();
+        }
+        if (value.isValueNode()) return "";
         if (value.isArray()) {
             StringBuilder all = new StringBuilder();
             value.forEach(part -> {
@@ -163,7 +248,7 @@ public class AsrService {
             });
             return all.toString();
         }
-        for (String key : new String[]{"text", "transcript", "transcription", "sentence", "content", "data", "result", "results", "segments"}) {
+        for (String key : new String[]{"text", "transcript", "transcription", "output", "sentence", "content", "data", "result", "results", "segments"}) {
             String text = extractText(value.get(key));
             if (StringUtils.hasText(text)) return text;
         }

@@ -59,3 +59,11 @@ jobs:
         env:
           AI_PLUS_HOME: ${{ github.workspace }}/.ci/ai-plus
         run: ./gradlew buildAll --no-daemon --stacktrace
+
+      - name: 上传 platform-agent 可部署制品
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: platform-agent-${{ github.sha }}
+          path: platform-modules/platform-agent/build/libs/platform-agent-1.0.0-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 7
