@@ -13,6 +13,7 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -81,12 +82,21 @@ public class DifyAgentClient implements AgentProviderClient {
                 .bodyValue(body)
                 .retrieve()
                 .bodyToFlux(CHAT_EVENT_TYPE)
-                .map(ServerSentEvent::data)
-                .filter(StringUtils::hasText)
+                .transform(DifyAgentClient::chatEventData)
                 .reduce(new DifyChatStreamAccumulator(objectMapper), DifyChatStreamAccumulator::accept)
                 .block(ProviderJsonSupport.timeout(objectMapper, definition));
         if (result == null) throw new BizException("Dify 应用未返回流式事件");
         return result.result();
+    }
+
+    /**
+     * 提取携带有效正文的 Dify SSE 事件。
+     *
+     * <p>Dify 可能发送仅包含事件类型的保活帧；必须先过滤空 data，再进入 Reactor 的非空映射链。</p>
+     */
+    static Flux<String> chatEventData(Flux<ServerSentEvent<String>> events) {
+        return events.filter(event -> event != null && StringUtils.hasText(event.data()))
+                .map(ServerSentEvent::data);
     }
 
     /** Dify Agent Chat 只支持 streaming，工作流使用 blocking。 */

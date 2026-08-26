@@ -148,10 +148,14 @@ public class AsrService {
         }
     }
 
-    private String extractText(JsonNode value) {
+    /** 从 ASR 上游标准 JSON 响应中递归提取转写文本。 */
+    static String extractText(JsonNode value) {
         if (value == null || value.isNull()) return "";
-        String scalar = value.stringValue();
-        if (scalar != null) return scalar.trim();
+        if (value.isTextual()) {
+            String text = value.stringValue();
+            return text == null ? "" : text.trim();
+        }
+        if (value.isValueNode()) return "";
         if (value.isArray()) {
             StringBuilder all = new StringBuilder();
             value.forEach(part -> {
