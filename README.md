@@ -20,8 +20,8 @@ AI Platform 是面向通用 AI 应用的多租户基础后端，提供统一网�
 ## 技术基线
 
 - Oracle GraalVM 25.0.4
-- Spring Boot 4.1.1
-- Spring Cloud 2025.1.2
+- Spring Boot 4.0.8
+- Spring Cloud 2025.1.3
 - Spring Cloud Alibaba 2025.1.0.0
 - Gradle 9.7.1
 - Jackson 3
