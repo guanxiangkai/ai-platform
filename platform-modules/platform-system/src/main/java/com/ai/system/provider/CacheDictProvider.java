@@ -23,29 +23,28 @@ import java.util.stream.Collectors;
  * <p>
  * 从数据库加载字典项，通过三级缓存（ThreeLevelCacheTemplate）加速翻译。
  *
- * <h3>为什么 dictItemRepository 用 {@code @Lazy @Autowired} 而非构造器注入？</h3>
+ * <h3>为什么字典服务使用 {@code @Lazy} 构造器注入？</h3>
  * <p>
  * 本类位于 JPA Plus 初始化链中：
  * <pre>
  *   JpaPlusExecutor → FieldEngine → DictFieldHandler → DictProvider（本类）
  * </pre>
- * 而 {@link DictItemRepository} 的工厂 Bean {@code JpaPlusRepositoryFactoryBean}
- * 持有 {@code JpaPlusExecutor} 字段。若使用构造器注入，Spring 启动时会立即实例化
- * {@code JpaPlusRepositoryFactoryBean}，从而形成循环依赖导致服务无法启动：
+ * 而字典服务依赖的 Repository 工厂 Bean {@code JpaPlusRepositoryFactoryBean}
+ * 持有 {@code JpaPlusExecutor} 字段。若立即解析字典服务，Spring 启动时会实例化
+ * {@code JpaPlusRepositoryFactoryBean}，从而形成循环依赖：
  * <pre>
- *   JpaPlusExecutor → ... → CacheDictProvider → DictItemRepository
+ *   JpaPlusExecutor → ... → CacheDictProvider → IDictItemService → DictItemRepository
  *                                                  → JpaPlusRepositoryFactoryBean
  *                                                  → JpaPlusExecutor ✗
  * </pre>
- * 改用 {@code @Lazy @Autowired} 字段注入后，Spring 只注入一个懒代理，不触发工厂 Bean 实例化。
+ * 在构造器参数上使用 {@code @Lazy} 后，Spring 注入懒代理而不立即触发工厂 Bean 实例化。
  * 真正调用 Repository 方法时（运行期），{@code JpaPlusExecutor} 早已就绪，循环消除：
  * <pre>
- *   启动期：JpaPlusExecutor → ... → CacheDictProvider ← 懒代理（不依赖 JpaPlusExecutor）✓
- *   运行期：懒代理 → DictItemRepository → JpaPlusExecutor（已就绪）✓
+ *   启动期：JpaPlusExecutor → ... → CacheDictProvider ← 字典服务懒代理 ✓
+ *   运行期：懒代理 → IDictItemService → DictItemRepository → JpaPlusExecutor（已就绪）✓
  * </pre>
  * <p>
- * 直接依赖 {@link DictItemRepository} 而非 {@code IDictItemService}，避免经过 Service 层
- * 再引入额外 Bean 依赖，同时可直接使用 Repository 上定义的所有 JPA/JPA-Plus 查询方法。
+ * 依赖 {@link IDictItemService} 保持 SPI 与持久化实现解耦，并由 Spring 的懒代理隔离初始化时序。
  *
  * @author guanxiangkai
  * @since 1.0.0

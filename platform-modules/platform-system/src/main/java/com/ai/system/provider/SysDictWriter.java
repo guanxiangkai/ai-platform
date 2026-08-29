@@ -8,7 +8,6 @@ import io.github.guanxiangkai.web.plus.core.util.SecurityUtils;
 import com.ai.system.domain.vo.DictItemVO;
 import com.ai.system.service.IDictItemService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -26,8 +25,8 @@ import java.util.stream.Collectors;
  * 配合 {@link SysDictProvider}（拉模式）使用，可兜底缓存未命中时的 L3 回源。
  * </p>
  *
- * <p><b>循环依赖说明：</b>与 {@code CacheDictProvider} 相同，通过 {@code @Lazy} 字段注入
- * 避免 {@code JpaPlusRepositoryFactoryBean} → {@code JpaPlusExecutor} 循环。</p>
+ * <p><b>循环依赖说明：</b>与 {@code CacheDictProvider} 相同，通过 {@code @Lazy} 构造器参数
+ * 注入字典服务代理，避免 {@code JpaPlusRepositoryFactoryBean} → {@code JpaPlusExecutor} 循环。</p>
  *
  * @author guanxiangkai
  * @since 1.0.0
@@ -38,9 +37,16 @@ import java.util.stream.Collectors;
 public class SysDictWriter implements DictWriter {
 
 
-    @Lazy
-    @Autowired
-    private IDictItemService dictItemService;
+    private final IDictItemService dictItemService;
+
+    /**
+     * 创建字典缓存写入器。
+     *
+     * @param dictItemService 延迟解析的字典项服务，用于隔离 JPA Plus 初始化时序
+     */
+    public SysDictWriter(@Lazy IDictItemService dictItemService) {
+        this.dictItemService = dictItemService;
+    }
 
     @Override
     public void write(DictWriteSink sink) {
