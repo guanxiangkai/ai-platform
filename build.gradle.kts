@@ -35,7 +35,8 @@ allprojects {
         options.compilerArgs.addAll(
             listOf(
                 "-parameters",
-                "-Xlint:deprecation"
+                "-Xlint:deprecation",
+                "-Werror"
             )
         )
     }
@@ -84,6 +85,7 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+        jvmArgs("-Xshare:off", "--enable-native-access=ALL-UNNAMED")
         testLogging {
             events("passed", "skipped", "failed")
         }
