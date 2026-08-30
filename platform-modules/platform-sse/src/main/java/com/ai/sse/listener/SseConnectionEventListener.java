@@ -77,6 +77,8 @@ public class SseConnectionEventListener {
         // 2. 不可变审计日志
         sseLogService.logDisconnect(
                 connection.connectionId(),
+                connection.userId(),
+                connection.tenantId(),
                 now,
                 connection.status()
         );
