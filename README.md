@@ -35,6 +35,8 @@ AI Platform 是面向通用 AI 应用的多租户基础后端，提供统一网�
 
 `docker/docker-compose.yml` 只是无真实值的参数化编排示例。生产配置、数据库结构与数据迁移由使用方在独立私有交付物中维护，不属于本公开仓库。
 
+Web Plus 接口载荷加密采用显式选择契约：未标注 `@ApiCrypto` 的端点始终使用标准 JSON，继承基础 Controller 不会隐式启用加密。只有调用方实现相同信封协议且端点确有载荷加密要求时，才在具体 JSON 端点标注；Dify、SSE、文件上传下载和其他非 JSON 流量保持未标注。
+
 ## 全链路可观测性
 
 所有平台服务统一引入 Web Plus TraceId 能力和 Spring Boot OpenTelemetry：

@@ -44,7 +44,7 @@ lombok-plugin = "9.5.0"          # Lombok Gradle 插件
 # 已发布版本不可覆盖。每个 Maven 模块独立维护版本，消费方只升级实际需要的模块。
 web-plus-core = "3.2.1"
 web-plus-error = "2.0.1"
-web-plus-web = "5.1.2"
+web-plus-web = "6.0.0"
 web-plus-security = "1.0.4"
 web-plus-protection = "2.0.1"
 web-plus-log = "2.0.1"
