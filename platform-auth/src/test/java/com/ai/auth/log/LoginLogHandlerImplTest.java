@@ -1,6 +1,5 @@
 package com.ai.auth.log;
 
-import com.ai.api.security.PasswordDigestProtocol;
 import com.ai.auth.repository.AuthLoginLogRepository;
 import com.ai.auth.properties.AuthSuperAdminProperties;
 import org.junit.jupiter.api.Test;
@@ -43,7 +42,7 @@ class LoginLogHandlerImplTest {
         AuthSuperAdminProperties properties = new AuthSuperAdminProperties(
                 true,
                 "root",
-                PasswordDigestProtocol.BCRYPT_MARKER + "$2b$12$" + "A".repeat(53)
+                "$2b$12$" + "A".repeat(53)
         );
         LoginLogHandlerImpl handler = new LoginLogHandlerImpl(repository, properties);
         AuthLoginLogRecord record = new AuthLoginLogRecord();

@@ -190,7 +190,7 @@ public class RegisterServiceImpl
         record.setAuditRemark(auditRemark);
 
         if (Boolean.TRUE.equals(approved)) {
-            if (!PasswordDigestProtocol.isProtocolBcryptHash(record.getPassword())) {
+            if (!PasswordDigestProtocol.isBcryptHash(record.getPassword())) {
                 throw new BizException("注册密码不是当前SHA-1摘要 BCrypt 协议，不能审核开通");
             }
             record.setRegistrationState(RegisterState.PROVISIONING);

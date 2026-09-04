@@ -90,10 +90,10 @@ class RegistrationOutboxTransactionServiceTest {
     }
 
     @Test
-    void claimShouldRejectAProvisioningRecordWithLegacyPasswordHash() {
+    void claimShouldRejectAProvisioningRecordWithCustomMarker() {
         RegistrationOutbox event = event(OutboxDeliveryState.PENDING);
         Register record = record(RegisterState.PROVISIONING);
-        record.setPassword("$2b$12$" + "A".repeat(53));
+        record.setPassword("{sha1-bcrypt}$2b$12$" + "A".repeat(53));
         when(outboxRepository.findLockedById(event.getId())).thenReturn(Optional.of(event));
         when(registerRepository.findLockedById(event.getAggregateId())).thenReturn(Optional.of(record));
 
@@ -194,7 +194,7 @@ class RegistrationOutboxTransactionServiceTest {
         record.setId("register-1");
         record.setDirectorySubjectId("subject-1");
         record.setUserId("user-1");
-        record.setPassword("{sha1-bcrypt}$2b$12$" + "A".repeat(53));
+        record.setPassword("$2b$12$" + "A".repeat(53));
         record.setRegistrationState(state);
         return record;
     }

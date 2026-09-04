@@ -208,7 +208,7 @@ class AuthServiceImplTest {
     }
 
     private static String validBcryptHash() {
-        return "{sha1-bcrypt}$2b$12$" + "A".repeat(53);
+        return "$2b$12$" + "A".repeat(53);
     }
 
     private static String digest() {

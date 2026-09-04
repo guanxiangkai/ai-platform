@@ -7,7 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * 平台账户密码编码器。
  *
  * <p>输入为 {@link PasswordDigestProtocol} 规定的 SHA-1 摘要，存储格式为
- * {@code {sha1-bcrypt}<bcrypt>}。缺少标识的旧 BCrypt 值被明确拒绝，迁移必须由部署流程完成。</p>
+ * 标准裸 BCrypt。存量哈希与新写入使用同一格式，不通过存储格式推断摘要算法。</p>
  */
 public final class ProtocolPasswordEncoder implements PasswordEncoder {
 
@@ -15,7 +15,7 @@ public final class ProtocolPasswordEncoder implements PasswordEncoder {
 
     @Override
     public String encode(CharSequence rawPassword) {
-        return PasswordDigestProtocol.BCRYPT_MARKER + bcrypt.encode(PasswordDigestProtocol.requireDigest(rawPassword));
+        return bcrypt.encode(PasswordDigestProtocol.requireDigest(rawPassword));
     }
 
     @Override
@@ -26,15 +26,14 @@ public final class ProtocolPasswordEncoder implements PasswordEncoder {
         } catch (IllegalArgumentException exception) {
             return false;
         }
-        if (!PasswordDigestProtocol.isProtocolBcryptHash(encodedPassword)) {
+        if (!PasswordDigestProtocol.isBcryptHash(encodedPassword)) {
             return false;
         }
-        return bcrypt.matches(digest, encodedPassword.substring(PasswordDigestProtocol.BCRYPT_MARKER.length()));
+        return bcrypt.matches(digest, encodedPassword);
     }
 
     @Override
     public boolean upgradeEncoding(String encodedPassword) {
-        return !PasswordDigestProtocol.isProtocolBcryptHash(encodedPassword)
-                || bcrypt.upgradeEncoding(encodedPassword.substring(PasswordDigestProtocol.BCRYPT_MARKER.length()));
+        return !PasswordDigestProtocol.isBcryptHash(encodedPassword) || bcrypt.upgradeEncoding(encodedPassword);
     }
 }

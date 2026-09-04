@@ -1,6 +1,7 @@
 package com.ai.api.security;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -14,7 +15,7 @@ class ProtocolPasswordEncoderTest {
         String digest = PasswordDigestProtocol.sha1Utf8("test-password");
         String encoded = encoder.encode(digest);
 
-        assertThat(encoded).startsWith(PasswordDigestProtocol.BCRYPT_MARKER);
+        assertThat(encoded).startsWith("$2");
         assertThat(encoder.matches(digest, encoded)).isTrue();
         assertThat(encoder.matches(PasswordDigestProtocol.sha1Utf8("wrong-password"), encoded)).isFalse();
     }
@@ -38,12 +39,15 @@ class ProtocolPasswordEncoderTest {
     }
 
     @Test
-    void rejectsUnmarkedLegacyBcryptAndUsesRandomSalt() {
+    void acceptsExistingStandardBcryptAndUsesRandomSalt() {
         String digest = PasswordDigestProtocol.sha1Utf8("test-password");
         String first = encoder.encode(digest);
         String second = encoder.encode(digest);
+        String existingBcrypt = new BCryptPasswordEncoder().encode(digest);
 
         assertThat(first).isNotEqualTo(second);
-        assertThat(encoder.matches(digest, first.substring(PasswordDigestProtocol.BCRYPT_MARKER.length()))).isFalse();
+        assertThat(encoder.matches(digest, first)).isTrue();
+        assertThat(encoder.matches(digest, existingBcrypt)).isTrue();
+        assertThat(encoder.matches(digest, "{sha1-bcrypt}" + first)).isFalse();
     }
 }

@@ -14,8 +14,6 @@ import java.util.regex.Pattern;
  */
 public final class PasswordDigestProtocol {
 
-    /** BCrypt 存储值的协议标识，防止把既有非协议密码哈希误认为可登录。 */
-    public static final String BCRYPT_MARKER = "{sha1-bcrypt}";
     /** 密码摘要 wire 格式：40 位小写 SHA-1 十六进制字符串。 */
     public static final String DIGEST_REGEX = "^[0-9a-f]{40}$";
     /** UTF-8 空字符串的 SHA-1，格式正确但违反密码非空不变量。 */
@@ -33,10 +31,10 @@ public final class PasswordDigestProtocol {
         return value.toString();
     }
 
-    /** 判断值是否为当前密码协议的已存储 BCrypt 哈希。 */
-    public static boolean isProtocolBcryptHash(String encodedPassword) {
+    /** 判断值是否为标准裸 BCrypt 存储格式。 */
+    public static boolean isBcryptHash(String encodedPassword) {
         return encodedPassword != null
-                && encodedPassword.matches("^\\{sha1-bcrypt}\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
+                && encodedPassword.matches("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
     }
 
     /** 仅供服务端生成的一次性随机密码转换为协议摘要；客户端不得提交原始密码。 */

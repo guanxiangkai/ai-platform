@@ -21,8 +21,8 @@ public record AuthSuperAdminProperties(
         if (enabled && (!StringUtils.hasText(username) || !StringUtils.hasText(passwordHash))) {
             throw new IllegalArgumentException("启用平台超级管理员时必须配置独立账号和密码哈希");
         }
-        if (enabled && !PasswordDigestProtocol.isProtocolBcryptHash(passwordHash.trim())) {
-            throw new IllegalArgumentException("平台超级管理员密码必须配置为带" + PasswordDigestProtocol.BCRYPT_MARKER + "标识的SHA-1摘要 BCrypt 哈希");
+        if (enabled && !PasswordDigestProtocol.isBcryptHash(passwordHash.trim())) {
+            throw new IllegalArgumentException("平台超级管理员密码必须配置为标准裸 BCrypt 哈希");
         }
         if (StringUtils.hasText(username)) {
             username = username.trim();

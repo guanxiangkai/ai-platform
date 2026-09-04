@@ -56,7 +56,7 @@ public class RegistrationOutboxTransactionService {
             event.setDeliveryState(OutboxDeliveryState.DEAD);
             return null;
         }
-        if (!PasswordDigestProtocol.isProtocolBcryptHash(record.getPassword())) {
+        if (!PasswordDigestProtocol.isBcryptHash(record.getPassword())) {
             event.setDeliveryState(OutboxDeliveryState.DEAD);
             record.setRegistrationState(RegisterState.PROVISIONING_FAILED);
             record.setProvisioningError("注册密码协议无效");
