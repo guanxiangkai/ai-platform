@@ -34,7 +34,7 @@ public final class PasswordDigestProtocol {
     /** 判断值是否为标准裸 BCrypt 存储格式。 */
     public static boolean isBcryptHash(String encodedPassword) {
         return encodedPassword != null
-                && encodedPassword.matches("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
+                && encodedPassword.matches("^\\$2[aby]\\$(?:0[4-9]|[12][0-9]|3[01])\\$[./A-Za-z0-9]{53}$");
     }
 
     /** 仅供服务端生成的一次性随机密码转换为协议摘要；客户端不得提交原始密码。 */

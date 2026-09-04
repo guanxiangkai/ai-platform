@@ -10,7 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @Configuration(proxyBeanMethods = false)
 public class SystemPasswordConfiguration {
 
-    /** 系统仅接受客户端 SHA-1 摘要，并以带协议标识的 BCrypt 存储。 */
+    /** 系统仅接受客户端 SHA-1 摘要，并以标准裸 BCrypt 存储。 */
     @Bean
     @Primary
     public PasswordEncoder protocolPasswordEncoder() {

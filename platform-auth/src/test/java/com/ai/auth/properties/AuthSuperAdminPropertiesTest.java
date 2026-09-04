@@ -29,6 +29,13 @@ class AuthSuperAdminPropertiesTest {
     }
 
     @Test
+    void enabledConfigurationRejectsBcryptHashWithUnsupportedCost() {
+        assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "$2b$32$" + "A".repeat(53)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("标准裸 BCrypt 哈希");
+    }
+
+    @Test
     void enabledConfigurationNormalizesValues() {
         AuthSuperAdminProperties properties = new AuthSuperAdminProperties(
                 true,

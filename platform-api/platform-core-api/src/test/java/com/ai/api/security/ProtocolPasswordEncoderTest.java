@@ -39,6 +39,14 @@ class ProtocolPasswordEncoderTest {
     }
 
     @Test
+    void rejectsBcryptHashWithAnUnsupportedCost() {
+        assertThat(PasswordDigestProtocol.isBcryptHash("$2b$04$" + "A".repeat(53))).isTrue();
+        assertThat(PasswordDigestProtocol.isBcryptHash("$2b$31$" + "A".repeat(53))).isTrue();
+        assertThat(PasswordDigestProtocol.isBcryptHash("$2b$03$" + "A".repeat(53))).isFalse();
+        assertThat(PasswordDigestProtocol.isBcryptHash("$2b$32$" + "A".repeat(53))).isFalse();
+    }
+
+    @Test
     void acceptsExistingStandardBcryptAndUsesRandomSalt() {
         String digest = PasswordDigestProtocol.sha1Utf8("test-password");
         String first = encoder.encode(digest);
