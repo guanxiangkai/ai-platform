@@ -28,4 +28,5 @@ ai:
     super-admin:
       enabled: ${PLATFORM_SUPER_ADMIN_ENABLED:false}
       username: ${PLATFORM_SUPER_ADMIN_USERNAME:}
+      # 值必须为 {sha1-bcrypt} 前缀加 BCrypt(SHA-1(UTF-8 原始密码))，旧 BCrypt 值会在启动时拒绝。
       password-hash: ${PLATFORM_SUPER_ADMIN_PASSWORD_HASH:}

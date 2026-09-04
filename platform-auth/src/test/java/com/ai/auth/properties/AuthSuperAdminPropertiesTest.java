@@ -22,10 +22,10 @@ class AuthSuperAdminPropertiesTest {
     }
 
     @Test
-    void enabledConfigurationRequiresRawBcryptHash() {
+    void enabledConfigurationRequiresProtocolBcryptHash() {
         assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "{bcrypt}encoded"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("原始 BCrypt 哈希");
+                .hasMessageContaining("sha1-bcrypt");
     }
 
     @Test
@@ -33,12 +33,12 @@ class AuthSuperAdminPropertiesTest {
         AuthSuperAdminProperties properties = new AuthSuperAdminProperties(
                 true,
                 " platform-admin ",
-                " $2b$12$" + "A".repeat(53) + " "
+                " {sha1-bcrypt}$2b$12$" + "A".repeat(53) + " "
         );
 
         assertThat(properties.configured()).isTrue();
         assertThat(properties.matchesUsername(" platform-admin ")).isTrue();
         assertThat(properties.username()).isEqualTo("platform-admin");
-        assertThat(properties.passwordHash()).startsWith("$2b$12$");
+        assertThat(properties.passwordHash()).startsWith("{sha1-bcrypt}$2b$12$");
     }
 }

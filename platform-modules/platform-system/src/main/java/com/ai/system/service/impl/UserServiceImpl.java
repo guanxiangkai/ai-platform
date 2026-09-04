@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * 用户服务实现
@@ -71,7 +70,7 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
         validateUserUniqueness(dto.username(), dto.email(), dto.phone(), null);
 
         User user = EntityConverter.toEntity(dto, User.class);
-        user.setPassword(passwordEncoder.encode(dto.password()));
+        user.setPassword(passwordEncoder.encode(dto.passwordDigest()));
         applyAdminFields(user, dto.userType(), false);
         User saved = repository.save(user);
 
@@ -119,8 +118,8 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
             user.setSortOrder(dto.sortOrder());
         }
 
-        if (StringUtils.hasText(dto.password())) {
-            user.setPassword(passwordEncoder.encode(dto.password()));
+        if (StringUtils.hasText(dto.passwordDigest())) {
+            user.setPassword(passwordEncoder.encode(dto.passwordDigest()));
         }
 
         repository.save(user);
@@ -394,16 +393,16 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Boolean changePassword(String id, String oldPassword, String newPassword) {
+    public Boolean changePassword(String id, String oldPasswordDigest, String newPasswordDigest) {
         User user = repository.findById(id)
                 .orElseThrow(() -> BizException.notFound("用户不存在"));
 
-        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+        if (!passwordEncoder.matches(oldPasswordDigest, user.getPassword())) {
             log.warn("旧密码错误: id={}", id);
             return false;
         }
 
-        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPassword(passwordEncoder.encode(newPasswordDigest));
         repository.save(user);
         authUserCacheService.refreshAfterCommit(id, null, true);
         return true;
@@ -411,15 +410,14 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String resetPassword(String id) {
+    public Boolean resetPassword(String id, String newPasswordDigest) {
         User user = repository.findById(id)
                 .orElseThrow(() -> BizException.notFound("用户不存在"));
 
-        String newPassword = UUID.randomUUID().toString().replace("-", "");
-        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPassword(passwordEncoder.encode(newPasswordDigest));
         repository.save(user);
         authUserCacheService.refreshAfterCommit(id, null, true);
-        return newPassword;
+        return true;
     }
 
     @Override

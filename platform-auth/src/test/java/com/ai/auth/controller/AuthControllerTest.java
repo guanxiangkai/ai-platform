@@ -23,7 +23,7 @@ class AuthControllerTest {
 
     @Test
     void shouldReturnBusinessFailureResponseWhenLoginFails() {
-        LoginRequest request = new LoginRequest("admin", "bad-password", null, null);
+        LoginRequest request = new LoginRequest("admin", "a".repeat(40), null, null);
         Mockito.when(authService.login(Mockito.eq(request), Mockito.any()))
                 .thenReturn(Mono.error(new BaseException.BusinessException("用户名或密码错误")));
 
@@ -33,7 +33,7 @@ class AuthControllerTest {
                 .bodyValue("""
                         {
                           "username": "admin",
-                          "password": "bad-password"
+                          "passwordDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                         }
                         """)
                 .exchange()
@@ -45,7 +45,7 @@ class AuthControllerTest {
 
     @Test
     void shouldSupportApiAuthLoginPrefix() {
-        LoginRequest request = new LoginRequest("admin", "bad-password", null, null);
+        LoginRequest request = new LoginRequest("admin", "a".repeat(40), null, null);
         Mockito.when(authService.login(Mockito.eq(request), Mockito.any()))
                 .thenReturn(Mono.error(new BaseException.BusinessException("用户名或密码错误")));
 
@@ -55,7 +55,7 @@ class AuthControllerTest {
                 .bodyValue("""
                         {
                           "username": "admin",
-                          "password": "bad-password"
+                          "passwordDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                         }
                         """)
                 .exchange()
@@ -63,5 +63,19 @@ class AuthControllerTest {
                 .expectBody()
                 .jsonPath("$.code").isEqualTo(400)
                 .jsonPath("$.message").isEqualTo("用户名或密码错误");
+    }
+
+    @Test
+    void shouldRejectRawPasswordBeforeCallingAuthService() {
+        webTestClient.post()
+                .uri("/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        { "username": "admin", "passwordDigest": "raw-password" }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest();
+
+        Mockito.verifyNoInteractions(authService);
     }
 }

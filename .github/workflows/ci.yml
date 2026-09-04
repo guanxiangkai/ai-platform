@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - 'fix/**'
 
 permissions:
   contents: read
@@ -65,5 +66,15 @@ jobs:
         with:
           name: platform-agent-${{ github.sha }}
           path: platform-modules/platform-agent/build/libs/platform-agent-1.0.0-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 上传认证与系统服务可部署制品
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-password-services-${{ github.sha }}
+          path: |
+            platform-auth/build/libs/platform-auth-1.0.0-SNAPSHOT.jar
+            platform-modules/platform-system/build/libs/platform-system-1.0.0-SNAPSHOT.jar
           if-no-files-found: error
           retention-days: 7

@@ -46,32 +46,35 @@ public class UserController extends BaseController<UserPageDTO, UserPageVO, User
     /**
      * 修改密码（仅限修改当前登录用户自己的密码）
      *
-     * @param request 包含旧密码和新密码的请求体（使用 RequestBody 而非 RequestParam，防止密码出现在访问日志中）
+     * @param request 包含旧密码和新密码 SHA-1 摘要的请求体（使用 RequestBody 而非 RequestParam，防止密码出现在访问日志中）
      * @return 修改是否成功
      */
     @OperationLog(entity = com.ai.api.system.log.PlatformOperationLog.class, typeCode = OperationTypes.UPDATE, module = "#{getModuleName()}", description = "#{getEntityName() + '密码修改'}")
-    @Operation(summary = "修改密码", description = "用户修改自己的密码，需要验证旧密码。")
+    @Operation(summary = "修改密码", description = "用户修改自己的密码；旧密码和新密码均提交UTF-8原始密码的SHA-1小写十六进制摘要。")
     @PostMapping("/changePassword")
     public ApiResponse<Boolean> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         String currentUserId = SecurityUtils.getUserId();
         if (currentUserId == null) {
             return ApiResponse.fail("用户未登录");
         }
-        return ApiResponse.ok(service.changePassword(currentUserId, request.oldPassword(), request.newPassword()));
+        return ApiResponse.ok(service.changePassword(currentUserId, request.oldPasswordDigest(), request.newPasswordDigest()));
     }
 
     /**
      * 重置密码
      *
      * @param id 用户ID
-     * @return 新密码
+     * @param request 新密码 SHA-1 摘要
+     * @return 是否重置成功
      */
     @RequiresPermission("system:user:resetPwd")
     @OperationLog(entity = com.ai.api.system.log.PlatformOperationLog.class, typeCode = OperationTypes.UPDATE, module = "#{getModuleName()}", description = "#{getEntityName() + '密码重置'}")
-    @Operation(summary = "重置密码", description = "管理员重置用户密码为默认密码。")
+    @Operation(summary = "重置密码", description = "管理员提交管理端本地生成密码的SHA-1小写十六进制摘要；服务端不回传密码。")
     @PostMapping("/resetPassword")
-    public ApiResponse<String> resetPassword(@RequestParam String id) {
-        return ApiResponse.ok(service.resetPassword(id));
+    public ApiResponse<Boolean> resetPassword(
+            @RequestParam String id,
+            @Valid @RequestBody ResetPasswordRequest request) {
+        return ApiResponse.ok(service.resetPassword(id, request.newPasswordDigest()));
     }
 
     /**

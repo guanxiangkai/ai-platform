@@ -75,7 +75,7 @@ class AuthUserCacheServiceTest {
         user.setId("user-1");
         user.setTenantId("tenant-a");
         user.setUsername("shared-user");
-        user.setPassword("{bcrypt}hash");
+        user.setPassword("{sha1-bcrypt}$2b$12$" + "A".repeat(53));
         user.setEnabled(true);
         user.setDeptId("dept-1");
         user.setNickname("共享账户");

@@ -39,6 +39,7 @@ public class User extends SortableTenantEntity {
     private String username;
 
     @Column(name = "password", nullable = false, length = 255, comment = "密码")
+    @ToString.Exclude
     private String password;
 
     @Column(name = "nickname", length = 64, comment = "昵称")

@@ -5,6 +5,8 @@ import com.ai.auth.domain.dto.LoginRequest;
 import com.ai.auth.properties.AuthSuperAdminProperties;
 import com.ai.auth.properties.JwtProperties;
 import com.ai.auth.service.AuthProtectionService;
+import com.ai.api.security.PasswordDigestProtocol;
+import com.ai.api.security.ProtocolPasswordEncoder;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -13,7 +15,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.HashMap;
@@ -31,7 +32,7 @@ class AuthServiceImplTest {
     @Test
     @SuppressWarnings("unchecked")
     void loginShouldUseConfiguredSuperAdminHashFromAuthConfigOnly() {
-        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+        PasswordEncoder passwordEncoder = new ProtocolPasswordEncoder();
         RsaJwtServiceImpl jwtService = mock(RsaJwtServiceImpl.class);
         JwtProperties jwtProperties = mock(JwtProperties.class);
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
@@ -39,7 +40,8 @@ class AuthServiceImplTest {
         AuthProtectionService authProtectionService = mock(AuthProtectionService.class);
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login").build());
 
-        String passwordHash = passwordEncoder.encode("platform-password");
+        String passwordDigest = PasswordDigestProtocol.sha1Utf8("platform-password");
+        String passwordHash = passwordEncoder.encode(passwordDigest);
         when(jwtService.generateAccessToken(eq("platform-super-admin"), any())).thenReturn("access-token");
         when(jwtService.generateRefreshToken(eq("platform-super-admin"), any())).thenReturn("refresh-token");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -56,7 +58,7 @@ class AuthServiceImplTest {
                 authProtectionService
         );
 
-        var response = authService.login(new LoginRequest("platform-admin", "platform-password", null, null), exchange).block();
+        var response = authService.login(new LoginRequest("platform-admin", passwordDigest, null, null), exchange).block();
 
         ArgumentCaptor<Map<String, Object>> claimsCaptor = ArgumentCaptor.forClass(Map.class);
         org.mockito.Mockito.verify(jwtService).generateAccessToken(eq("platform-super-admin"), claimsCaptor.capture());
@@ -92,7 +94,7 @@ class AuthServiceImplTest {
         when(jwtProperties.getRefreshTokenExpirationSeconds()).thenReturn(86400L);
 
         String bcryptHash = validBcryptHash();
-        when(passwordEncoder.matches("password", bcryptHash)).thenReturn(true);
+        when(passwordEncoder.matches(digest(), bcryptHash)).thenReturn(true);
         AuthServiceImpl authService = new AuthServiceImpl(
                 passwordEncoder,
                 jwtService,
@@ -102,7 +104,7 @@ class AuthServiceImplTest {
                 authProtectionService
         );
 
-        var response = authService.login(new LoginRequest("admin", "password", null, null), exchange).block();
+        var response = authService.login(new LoginRequest("admin", digest(), null, null), exchange).block();
 
         ArgumentCaptor<Map<String, Object>> claimsCaptor = ArgumentCaptor.forClass(Map.class);
         org.mockito.Mockito.verify(jwtService).generateAccessToken(eq("platform-super-admin"), claimsCaptor.capture());
@@ -130,7 +132,7 @@ class AuthServiceImplTest {
         Map<Object, Object> authHash = new HashMap<>();
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_ID, "2");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_USERNAME, "tenant-user");
-        authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_PASSWORD_HASH, "{bcrypt}password");
+        authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_PASSWORD_HASH, validBcryptHash());
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_ENABLED, "true");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_TOKEN_VERSION, "1");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_NICKNAME, "租户用户");
@@ -143,7 +145,7 @@ class AuthServiceImplTest {
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_PERMISSIONS, "[\"home:view\"]");
         authHash.put(AuthConstants.UserAuthCacheConstants.FIELD_DEPT_IDS, "[\"dept-1\"]");
 
-        when(passwordEncoder.matches("password", "{bcrypt}password")).thenReturn(true);
+        when(passwordEncoder.matches(digest(), validBcryptHash())).thenReturn(true);
         when(jwtService.generateAccessToken(eq("2"), any())).thenReturn("access-token");
         when(jwtService.generateRefreshToken(eq("2"), any())).thenReturn("refresh-token");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -169,7 +171,7 @@ class AuthServiceImplTest {
                 authProtectionService
         );
 
-        var response = authService.login(new LoginRequest("tenant-user", "password", null, null), exchange).block();
+        var response = authService.login(new LoginRequest("tenant-user", digest(), null, null), exchange).block();
 
         ArgumentCaptor<Map<String, Object>> claimsCaptor = ArgumentCaptor.forClass(Map.class);
         org.mockito.Mockito.verify(jwtService).generateAccessToken(eq("2"), claimsCaptor.capture());
@@ -189,7 +191,7 @@ class AuthServiceImplTest {
         AuthProtectionService authProtectionService = mock(AuthProtectionService.class);
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login").build());
         String passwordHash = validBcryptHash();
-        when(passwordEncoder.matches("unrelated-password", passwordHash)).thenReturn(false);
+        when(passwordEncoder.matches(digest(), passwordHash)).thenReturn(false);
 
         AuthServiceImpl authService = new AuthServiceImpl(
                 passwordEncoder,
@@ -201,11 +203,15 @@ class AuthServiceImplTest {
         );
 
         assertThatThrownBy(() -> authService.login(
-                new LoginRequest("platform-admin", "unrelated-password", null, null), exchange).block())
+                new LoginRequest("platform-admin", digest(), null, null), exchange).block())
                 .hasMessageContaining("用户名或密码错误");
     }
 
     private static String validBcryptHash() {
-        return "$2b$12$" + "A".repeat(53);
+        return "{sha1-bcrypt}$2b$12$" + "A".repeat(53);
+    }
+
+    private static String digest() {
+        return "a".repeat(40);
     }
 }
