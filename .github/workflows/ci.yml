@@ -40,11 +40,11 @@ jobs:
       - name: 检出平台源码
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: 检出 AI Plus 当前主分支
+      - name: 检出已固定的 AI Plus 源码
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: guanxiangkai/ai-plus
-          ref: main
+          ref: acae634f9c31b1d461eda12cb58b7bb7e82ff567
           path: .ci/ai-plus
 
       - name: 配置 JDK 25
