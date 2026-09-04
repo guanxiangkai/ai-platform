@@ -31,6 +31,13 @@ class ProtocolPasswordEncoderTest {
     }
 
     @Test
+    void rejectsDigestOfAnEmptyPassword() {
+        String emptyPasswordDigest = PasswordDigestProtocol.sha1Utf8("");
+
+        assertThatIllegalArgumentException().isThrownBy(() -> encoder.encode(emptyPasswordDigest));
+    }
+
+    @Test
     void rejectsUnmarkedLegacyBcryptAndUsesRandomSalt() {
         String digest = PasswordDigestProtocol.sha1Utf8("test-password");
         String first = encoder.encode(digest);

@@ -18,6 +18,8 @@ public final class PasswordDigestProtocol {
     public static final String BCRYPT_MARKER = "{sha1-bcrypt}";
     /** 密码摘要 wire 格式：40 位小写 SHA-1 十六进制字符串。 */
     public static final String DIGEST_REGEX = "^[0-9a-f]{40}$";
+    /** UTF-8 空字符串的 SHA-1，格式正确但违反密码非空不变量。 */
+    private static final String EMPTY_PASSWORD_DIGEST = sha1Utf8("");
     private static final Pattern DIGEST = Pattern.compile(DIGEST_REGEX);
 
     private PasswordDigestProtocol() {
@@ -25,7 +27,7 @@ public final class PasswordDigestProtocol {
 
     /** 验证并返回规范化的密码摘要。 */
     public static String requireDigest(CharSequence value) {
-        if (value == null || !DIGEST.matcher(value).matches()) {
+        if (value == null || !DIGEST.matcher(value).matches() || EMPTY_PASSWORD_DIGEST.contentEquals(value)) {
             throw new IllegalArgumentException("密码摘要必须为40位小写SHA-1十六进制字符串");
         }
         return value.toString();
