@@ -71,12 +71,17 @@ public class SseConnectionEventListener {
         // 1. 可变连接记录
         connectionRecordService.logDisconnect(
                 connection.connectionId(),
+                connection.userId(),
+                connection.tenantId(),
+                connection.connectTime(),
                 now,
                 connection.status()
         );
         // 2. 不可变审计日志
         sseLogService.logDisconnect(
                 connection.connectionId(),
+                connection.userId(),
+                connection.tenantId(),
                 now,
                 connection.status()
         );

@@ -35,7 +35,8 @@ allprojects {
         options.compilerArgs.addAll(
             listOf(
                 "-parameters",
-                "-Xlint:deprecation"
+                "-Xlint:deprecation",
+                "-Werror"
             )
         )
     }
@@ -60,13 +61,14 @@ subprojects {
     }
 
     dependencies {
-        // 导入 Spring Boot BOM（使用 api 确保版本管理传递到依赖方）
+        // 平台应用以 Spring Cloud Alibaba 的正式兼容矩阵为准，禁止三方库携带的构建 BOM
+        // 反向抬升运行时 Spring Boot 版本；api 只传递版本建议，平台自身配置强制使用锁定版本。
         // ⚠️ 根脚本 subprojects {} 中 Kotlin DSL 无法直接使用 api()，需通过字符串配置名
         "api"(platform(springBootDependencies.get()))
-        "implementation"(platform(springBootDependencies.get()))
-        "compileOnly"(platform(springBootDependencies.get()))
-        "annotationProcessor"(platform(springBootDependencies.get()))
-        testImplementation(platform(springBootDependencies.get()))
+        "implementation"(enforcedPlatform(springBootDependencies.get()))
+        "compileOnly"(enforcedPlatform(springBootDependencies.get()))
+        "annotationProcessor"(enforcedPlatform(springBootDependencies.get()))
+        testImplementation(enforcedPlatform(springBootDependencies.get()))
         // 导入 Spring Cloud BOM
         "api"(platform(springCloudDependencies.get()))
         // 导入 Spring Cloud Alibaba BOM
@@ -84,6 +86,7 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+        jvmArgs("-Xshare:off", "--enable-native-access=ALL-UNNAMED")
         testLogging {
             events("passed", "skipped", "failed")
         }

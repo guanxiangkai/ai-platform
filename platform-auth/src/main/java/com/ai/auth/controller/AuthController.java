@@ -40,7 +40,7 @@ public class AuthController {
     /**
      * 用户登录
      */
-    @Operation(summary = "用户登录", description = "通过用户名和密码进行登录，返回访问令牌和刷新令牌")
+    @Operation(summary = "用户登录", description = "提交用户名和 UTF-8 原始密码的SHA-1小写十六进制摘要进行登录，返回访问令牌和刷新令牌")
     @PostMapping("/login")
     public Mono<ApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest request,

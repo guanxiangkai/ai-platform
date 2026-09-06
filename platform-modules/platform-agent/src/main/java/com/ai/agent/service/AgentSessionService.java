@@ -11,6 +11,7 @@ import com.ai.agent.domain.entity.AgentConfig;
 import com.ai.agent.domain.entity.Skill;
 import com.ai.agent.domain.entity.SkillAgentRelation;
 import com.ai.agent.domain.vo.AgentSessionAskResponse;
+import com.ai.agent.domain.vo.AgentSessionStreamEvent;
 import com.ai.agent.domain.vo.AgentViews;
 import com.ai.agent.repository.AgentConfigRepository;
 import com.ai.agent.repository.SkillAgentRelationRepository;
@@ -24,7 +25,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
 
+import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +64,7 @@ public class AgentSessionService {
         AgentConfig agent = StringUtils.hasText(request.skillId())
                 ? resolveSkillAgent(tenantId, userId, request.skillId().trim())
                 : resolveDirectAgent(tenantId);
-        AgentViews.InvocationResult result = invocations.invoke(agent.getId(), new AgentInvocationRequest(
+        AgentInvocationRequest invocation = new AgentInvocationRequest(
                 trimToNull(request.invocationId()),
                 trimToNull(request.sessionId()),
                 request.content().trim(),
@@ -64,7 +72,9 @@ public class AgentSessionService {
                 trimToNull(request.scopeTag()),
                 trimToNull(request.skillId()),
                 variables(request, tenantId, userId)
-        ));
+        );
+        AgentViews.InvocationResult result = invocations.invoke(
+                agent.getId(), invocation, trustedMessage(request.content()));
         return new AgentSessionAskResponse(
                 result.messageId(),
                 result.invocationId(),
@@ -73,6 +83,70 @@ public class AgentSessionService {
                 List.of(),
                 List.of()
         );
+    }
+
+    /** 使用当前用户获准的技能发起流式智能体会话。 */
+    public Flux<AgentSessionStreamEvent> stream(AgentSessionAskRequest request) {
+        String tenantId = currentTenantId();
+        String userId = currentUserId();
+        AgentConfig agent = StringUtils.hasText(request.skillId())
+                ? resolveSkillAgent(tenantId, userId, request.skillId().trim())
+                : resolveDirectAgent(tenantId);
+        AgentInvocationRequest invocation = new AgentInvocationRequest(
+                trimToNull(request.invocationId()),
+                trimToNull(request.sessionId()),
+                request.content().trim(),
+                null,
+                trimToNull(request.scopeTag()),
+                trimToNull(request.skillId()),
+                variables(request, tenantId, userId)
+        );
+        return invocations.stream(agent.getId(), invocation, trustedMessage(request.content()))
+                .map(this::streamEvent);
+    }
+
+    private AgentSessionStreamEvent streamEvent(AgentInvocationService.StreamEvent event) {
+        return switch (event.type()) {
+            case START -> AgentSessionStreamEvent.start(event.invocationId(), event.sessionId());
+            case DELTA -> AgentSessionStreamEvent.delta(
+                    event.invocationId(), event.sessionId(), event.content());
+            case REPLACE -> AgentSessionStreamEvent.replace(
+                    event.invocationId(), event.sessionId(), event.content());
+            case COMPLETE -> AgentSessionStreamEvent.complete(response(event.result()));
+            case ERROR -> AgentSessionStreamEvent.error(
+                    event.invocationId(), event.sessionId(), event.message());
+        };
+    }
+
+    private AgentSessionAskResponse response(AgentViews.InvocationResult result) {
+        return new AgentSessionAskResponse(
+                result.messageId(),
+                result.invocationId(),
+                result.sessionId(),
+                result.text(),
+                List.of(),
+                List.of()
+        );
+    }
+
+    private String trustedMessage(String originalMessage) {
+        return trustedMessage(originalMessage, Clock.systemDefaultZone());
+    }
+
+    static String trustedMessage(String originalMessage, Clock clock) {
+        ZonedDateTime now = ZonedDateTime.now(clock);
+        LocalDate today = now.toLocalDate();
+        LocalDate thisMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate thisSunday = thisMonday.plusDays(6);
+        LocalDate nextMonday = thisMonday.plusWeeks(1);
+        LocalDate nextSunday = nextMonday.plusDays(6);
+        return "【平台可信时间】\n"
+                + "当前时间：" + DateTimeFormatter.ISO_ZONED_DATE_TIME.format(now) + "\n"
+                + "当前日期：" + DateTimeFormatter.ISO_LOCAL_DATE.format(today) + "\n"
+                + "本周周一至周日：" + thisMonday + " 至 " + thisSunday + "\n"
+                + "下周周一至周日：" + nextMonday + " 至 " + nextSunday + "\n"
+                + "【用户原始消息】\n"
+                + originalMessage.trim();
     }
 
     private AgentConfig resolveSkillAgent(String tenantId, String userId, String skillId) {

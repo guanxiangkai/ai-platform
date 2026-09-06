@@ -5,7 +5,6 @@ import io.github.guanxiangkai.web.plus.core.spi.DictProvider;
 import com.ai.system.domain.vo.DictItemVO;
 import com.ai.system.service.IDictItemService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -28,9 +27,16 @@ import java.util.List;
 public class SysDictProvider implements DictProvider {
 
 
-    @Lazy
-    @Autowired
-    private IDictItemService dictItemService;
+    private final IDictItemService dictItemService;
+
+    /**
+     * 创建字典回源提供者。
+     *
+     * @param dictItemService 延迟解析的字典项服务，用于隔离 JPA Plus 初始化时序
+     */
+    public SysDictProvider(@Lazy IDictItemService dictItemService) {
+        this.dictItemService = dictItemService;
+    }
 
     @Override
     public List<DictItem> provide(String code) {

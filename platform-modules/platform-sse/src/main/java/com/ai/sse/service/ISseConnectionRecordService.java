@@ -40,13 +40,17 @@ public interface ISseConnectionRecordService extends IBaseService<SseConnectionR
                     LocalDateTime connectTime, String clientIp);
 
     /**
-     * 记录连接断开（更新已有记录）
+     * 记录连接断开。连接建立审计晚到时，使用事件携带的完整身份和时间信息创建终态记录。
      *
      * @param connectionId     连接唯一标识
+     * @param userId           用户 ID
+     * @param tenantId         租户 ID
+     * @param connectTime      原始连接建立时间
      * @param disconnectTime   断开时间
      * @param disconnectReason 断开原因（disconnected / error / timeout）
      */
-    void logDisconnect(String connectionId, LocalDateTime disconnectTime, String disconnectReason);
+    void logDisconnect(String connectionId, String userId, String tenantId,
+                       LocalDateTime connectTime, LocalDateTime disconnectTime, String disconnectReason);
 
     // ==================== 查询统计 ====================
 

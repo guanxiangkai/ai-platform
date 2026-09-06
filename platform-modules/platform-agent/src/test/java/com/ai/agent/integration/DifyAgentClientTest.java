@@ -86,6 +86,46 @@ class DifyAgentClientTest {
     }
 
     @Test
+    void streamShouldForwardTextEventsAndPersistTheAccumulatedCompletionResult() {
+        String sseBody = "event: ping\n\n"
+                + "event: agent_message\n"
+                + "data: {\"event\":\"agent_message\",\"answer\":\"初稿\","
+                + "\"conversation_id\":\"conversation-1\"}\n\n"
+                + "event: message_replace\n"
+                + "data: {\"event\":\"message_replace\",\"answer\":\"修订回答\"}\n\n"
+                + "event: message_end\n"
+                + "data: {\"event\":\"message_end\",\"metadata\":{\"usage\":{"
+                + "\"prompt_tokens\":12,\"completion_tokens\":8}}}\n\n";
+        WebClient.Builder builder = WebClient.builder().exchangeFunction(request -> Mono.just(
+                ClientResponse.create(HttpStatus.OK)
+                        .header("Content-Type", MediaType.TEXT_EVENT_STREAM_VALUE)
+                        .body(sseBody)
+                        .build()));
+        AgentConfig definition = new AgentConfig();
+        definition.setInvocationMode(AgentInvocationMode.CHAT);
+        definition.setEndpointUrl("https://dify.example/v1/chat-messages");
+        definition.setCredential("test-credential");
+        AgentInvocationRequest request = new AgentInvocationRequest(
+                "invocation-1", null, "你好", null, null, null, java.util.Map.of());
+
+        List<AgentProviderStreamEvent> events = new DifyAgentClient(builder, objectMapper)
+                .stream(definition, new AgentProviderInvocation(request, "user-1", "invocation-1", null, List.of()))
+                .collectList()
+                .block();
+
+        assertThat(events).extracting(AgentProviderStreamEvent::type)
+                .containsExactly(
+                        AgentProviderStreamEvent.Type.DELTA,
+                        AgentProviderStreamEvent.Type.REPLACE,
+                        AgentProviderStreamEvent.Type.COMPLETE);
+        AgentProviderResult completed = events.getLast().result();
+        assertThat(completed.text()).isEqualTo("修订回答");
+        assertThat(completed.providerConversationId()).isEqualTo("conversation-1");
+        assertThat(completed.inputTokens()).isEqualTo(12);
+        assertThat(completed.outputTokens()).isEqualTo(8);
+    }
+
+    @Test
     void shouldAggregateAnswerWithoutExposingThoughtEvents() {
         DifyChatStreamAccumulator accumulator = new DifyChatStreamAccumulator(objectMapper)
                 .accept("{\"event\":\"agent_thought\",\"thought\":\"内部推理\"}")

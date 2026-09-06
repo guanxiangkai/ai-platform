@@ -37,6 +37,12 @@ final class DifyChatStreamAccumulator {
             throw new BizException("Dify 流式响应不是合法 JSON");
         }
 
+        return accept(event);
+    }
+
+    /** 接收已经完成 JSON 解析的单个 SSE data 载荷。 */
+    DifyChatStreamAccumulator accept(JsonNode event) {
+        if (event == null || event.isNull()) return this;
         String eventType = ProviderJsonSupport.text(event, "event");
         if (!StringUtils.hasText(eventType) || "ping".equals(eventType)) return this;
         String currentConversationId = ProviderJsonSupport.text(event, "conversation_id");

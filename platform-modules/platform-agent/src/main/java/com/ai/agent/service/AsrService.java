@@ -232,7 +232,7 @@ public class AsrService {
     /** 从 ASR 上游标准 JSON 响应中递归提取转写文本。 */
     static String extractText(JsonNode value) {
         if (value == null || value.isNull()) return "";
-        if (value.isTextual()) {
+        if (value.isString()) {
             String text = value.stringValue();
             return text == null ? "" : text.trim();
         }

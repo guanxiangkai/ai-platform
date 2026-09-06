@@ -22,10 +22,17 @@ class AuthSuperAdminPropertiesTest {
     }
 
     @Test
-    void enabledConfigurationRequiresRawBcryptHash() {
+    void enabledConfigurationRequiresStandardBcryptHash() {
         assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "{bcrypt}encoded"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("原始 BCrypt 哈希");
+                .hasMessageContaining("标准裸 BCrypt 哈希");
+    }
+
+    @Test
+    void enabledConfigurationRejectsBcryptHashWithUnsupportedCost() {
+        assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "$2b$32$" + "A".repeat(53)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("标准裸 BCrypt 哈希");
     }
 
     @Test

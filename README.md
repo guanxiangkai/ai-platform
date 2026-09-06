@@ -44,8 +44,8 @@ Netty 事件循环，启用虚拟线程本身不等于消除阻塞。
 ## 技术基线
 
 - Oracle GraalVM 25.0.4
-- Spring Boot 4.1.1
-- Spring Cloud 2025.1.2
+- Spring Boot 4.0.8
+- Spring Cloud 2025.1.3
 - Spring Cloud Alibaba 2025.1.0.0
 - Gradle 9.7.1
 - Jackson 3
@@ -68,6 +68,21 @@ AWS SDK v2 使用 2.54.13；升级验收覆盖 S3 兼容端点、路径风格、
 仓库只声明运行时环境变量契约，不保存 Nacos 地址、命名空间、用户名、密码、数据库连接、Redis/Kafka/S3 凭据、JWT 密钥或真实数据。`application.yml` 中的值由部署环境提供，Gradle 不执行凭据资源替换，因此构建产物不会固化某个环境的连接信息。
 
 `docker/docker-compose.yml` 只是无真实值的参数化编排示例。生产配置、数据库结构与数据迁移由使用方在独立私有交付物中维护，不属于本公开仓库。
+
+Web Plus 接口载荷加密采用显式选择契约：未标注 `@ApiCrypto` 的端点始终使用标准 JSON，继承基础 Controller 不会隐式启用加密。只有调用方实现相同信封协议且端点确有载荷加密要求时，才在具体 JSON 端点标注；Dify、SSE、文件上传下载和其他非 JSON 流量保持未标注。
+
+账户接口使用 `passwordDigest` 字段传递 UTF-8 密码的 40 位小写 SHA-1 摘要，
+空密码摘要、明文密码和 BCrypt 存储值均不是合法输入。服务端使用标准 BCrypt 存储摘要，
+登录、注册、开通、改密和重置密码遵循同一协议。摘要属于密码等效凭据，传输仍须使用 HTTPS。
+
+`POST /agent/session/ask/stream` 返回 `start`、`delta`、`replace`、`complete` 或 `error` 事件。
+Dify 适配器处理真实增量与全文替换；OpenAI-compatible 适配器当前返回单个完成结果，
+不提供逐 token 输出。上游结果先持久化为可恢复状态，再完成消息和会话写入；重复幂等调用
+可恢复已持久化结果。提供方错误只向调用方返回固定文案，审计记录保留错误类别，
+不保存第三方异常正文。平台时间上下文只用于提供方请求，用户原始消息保留原文。
+
+SSE 生命周期审计在 PostgreSQL 事务中按租户与连接标识串行合并事件，
+断开先到也会保留终态，重复或延迟的连接事件不会覆盖首次断开事实。
 
 ## 全链路可观测性
 
@@ -92,14 +107,24 @@ AWS SDK v2 使用 2.54.13；升级验收覆盖 S3 兼容端点、路径风格、
 
 ## 构建与验证
 
-Linux CI 会同时检出 AI Plus 当前 `main`，以源码 composite build 验证平台实际使用的是 AI Plus 的最新公开基线：
+Linux CI 以两条独立路径验证依赖：源码联调检出工作流固定的 AI Plus 提交，
+发布依赖校验直接从 Maven Central 解析制品。两条路径都执行全部平台模块的构建与测试，
+可部署制品仅由发布依赖校验产出，避免源码替换掩盖缺失或不完整的发布依赖。
+
+源码联调：
 
 ```bash
 AI_PLUS_HOME=/path/to/ai-plus ./gradlew buildAll --no-daemon --stacktrace
 ```
 
+发布依赖校验不设置 `AI_PLUS_HOME` 或 `aiPlusHome`：
+
+```bash
+./gradlew buildAll --no-daemon --stacktrace
+```
+
 Gradle、Version Catalog、GitHub Actions 与 Docker 镜像由 `.github/dependabot.yml`
-每周检查并分组提交更新；所有更新仍需同时通过 AI Platform 与 AI Plus 当前源码构建，
+每周检查并分组提交更新；所有更新仍需通过源码联调和发布依赖两条校验路径，
 不能绕过质量门禁直接进入 `main`。
 
 PostgreSQL 并发约束测试使用 Testcontainers 和测试类内的最小临时 DDL，不读取或分发部署数据库脚本。

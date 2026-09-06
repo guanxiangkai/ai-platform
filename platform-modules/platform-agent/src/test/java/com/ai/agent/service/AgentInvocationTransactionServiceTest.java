@@ -142,6 +142,30 @@ class AgentInvocationTransactionServiceTest {
                 AgentInvocationState.SUCCEEDED, "assistant-message-1");
     }
 
+    @Test
+    void failureShouldKeepExceptionCategoryWithoutPersistingProviderDetails() {
+        AgentSessionRecord session = session();
+        session.setActiveInvocationId("invocation-1");
+        when(calls.findLockedByTenantIdAndInvocationId("tenant-1", "invocation-1"))
+                .thenReturn(Optional.of(call(AgentInvocationState.RUNNING)));
+        when(sessions.findLockedByIdAndTenantId("session-1", "tenant-1"))
+                .thenReturn(Optional.of(session));
+        when(calls.compareAndSetFailed("tenant-1", "invocation-1", "token-1",
+                AgentInvocationState.RUNNING, AgentInvocationState.FAILED, 12L,
+                "IllegalStateException", "智能体调用失败")).thenReturn(1);
+        var reservation = AgentInvocationTransactionService.Reservation.execute(
+                "invocation-1", "token-1", session, List.of());
+
+        service.fail(reservation, new IllegalStateException(
+                "https://provider.example.invalid/?token=fake-private-detail"), 12L);
+
+        verify(calls).compareAndSetFailed("tenant-1", "invocation-1", "token-1",
+                AgentInvocationState.RUNNING, AgentInvocationState.FAILED, 12L,
+                "IllegalStateException", "智能体调用失败");
+        assertThat(session.getActiveInvocationId()).isNull();
+        verify(sessions).save(session);
+    }
+
     private AgentSessionRecord session() {
         AgentSessionRecord session = new AgentSessionRecord();
         session.setId("session-1");

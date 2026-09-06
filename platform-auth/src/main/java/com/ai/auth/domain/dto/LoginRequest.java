@@ -1,7 +1,10 @@
 package com.ai.auth.domain.dto;
 
+import com.ai.api.security.PasswordDigestProtocol;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -18,9 +21,11 @@ public record LoginRequest(
         @NotBlank(message = "用户名不能为空")
         String username,
 
-        @Schema(description = "密码", example = "123456")
-        @NotBlank(message = "密码不能为空")
-        String password,
+        @Schema(description = "UTF-8原始密码的SHA-1小写十六进制摘要", example = "40位小写hex", accessMode = Schema.AccessMode.WRITE_ONLY)
+        @NotBlank(message = "密码摘要不能为空")
+        @Pattern(regexp = PasswordDigestProtocol.DIGEST_REGEX, message = "密码摘要必须为40位小写SHA-1十六进制字符串")
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+        String passwordDigest,
 
         @Schema(description = "验证码", example = "1234")
         String captcha,
@@ -30,4 +35,9 @@ public record LoginRequest(
 ) implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
+
+    @Override
+    public String toString() {
+        return "LoginRequest[username=" + username + ", passwordDigest=[REDACTED], captcha=[REDACTED], captchaKey=[REDACTED]]";
+    }
 }
