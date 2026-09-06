@@ -17,6 +17,30 @@ AI Platform 是面向通用 AI 应用的多租户基础后端，提供统一网�
 
 各消费方通过配置为网关声明自己的路径前缀、租户映射和下游路由；源码不预置任何产品名、租户 ID 或业务服务名。
 
+## 设计与扩展边界
+
+平台按领域拆分独立服务，`platform-api` 提供服务间契约，AI Plus 提供可复用基础能力。
+典型请求经过网关校验和租户路由后，由目标服务的 Controller 接收，应用服务编排用例，
+Repository 负责数据库访问，外部适配器连接模型服务、S3 或 PowerJob。
+网关保持响应式调用；领域服务使用 JPA 等阻塞依赖时，必须通过专用执行器隔离
+Netty 事件循环，启用虚拟线程本身不等于消除阻塞。
+
+| 变化点 | 当前设计 | 扩展方式 |
+| --- | --- | --- |
+| 系统与 Agent 服务调用 | Spring HTTP Interface 与自动配置的 WebClient | 在服务契约中增加操作，复用服务发现与可观测性配置 |
+| 内部文件调用 | `FilesClient` 隔离调用方，`HttpFilesClient` 封装传输及响应校验 | 复用 `ApiResponse<T>` 和 Spring/Jackson 泛型解码，增加 DTO 与契约测试；下载保持流式传递 |
+| SSE 连接维护 | Spring 定时调度调用 `SseOperations` 的心跳与清理契约 | 替换实现必须实现维护方法；维护范围仅为本实例，不依赖默认实现的类型判断 |
+| SSE 生命周期事件 | Spring ApplicationEvent 与事件监听器 | 在独立监听器中处理连接、断开和消息事件 |
+| 文件存储 | AWS SDK v2 的 S3 客户端与平台存储适配器 | 配置 S3 兼容端点；保留 SDK 签名、协议和资源管理能力 |
+| 任务调度 | PowerJob 独立引擎与平台调度控制面 | 处理器位于任务所属领域，平台只维护定义、同步与执行查询 |
+
+设计模式只用于真实变化点：适配器隔离外部协议，接口约束可替换实现，事件监听器解耦生命周期响应。
+不额外引入通用工厂、全局服务定位器或与 AI Plus 重复的基础框架。
+
+当前仍需关注两个运行边界：SSE 的 Redis Pub/Sub 桥接不提供离线重放或投递确认；
+调度定义同步仍在数据库事务中调用 PowerJob。需要可靠投递或自动补偿时，必须同时设计
+持久化、幂等、租约、失败重试及并发验收，不能仅用进程内异步事件替代持久化同步。
+
 ## 技术基线
 
 - Oracle GraalVM 25.0.4
@@ -28,6 +52,16 @@ AI Platform 是面向通用 AI 应用的多租户基础后端，提供统一网�
 - AI Plus 公共 Maven Central 制品；联合开发可通过 `AI_PLUS_HOME` 使用当前源码 composite build
 
 依赖版本集中在 `gradle/libs.versions.toml`。同一用途的依赖优先通过 Version Catalog bundle 引入，避免多个模块重复维护依赖组合。
+
+Spring Boot、Spring Cloud、Spring Cloud Alibaba 的升级必须共同核对官方支持矩阵，
+并验证网关、Nacos 与 JPA 的实际运行契约，不能只按最高版本号单独抬升 BOM。
+AWS SDK v2 使用 2.54.13；升级验收覆盖 S3 兼容端点、路径风格、签名与上传下载。
+本地预签名测试验证 SDK 的端点解析与签名参数，不替代真实存储服务的读写验收。
+
+选型依据：[Spring Cloud 发布说明](https://spring.io/blog/2026/08/20/spring-cloud-2025-1-3-has-been-released/)、
+[Alibaba 兼容线](https://sca.aliyun.com/en/docs/2025.x/overview/faq/)、
+[Spring HTTP 客户端](https://docs.spring.io/spring-framework/reference/integration/rest-clients.html)、
+[AWS SDK 发布说明](https://github.com/aws/aws-sdk-java-v2/releases/tag/2.54.13)。
 
 ## 配置与安全边界
 
