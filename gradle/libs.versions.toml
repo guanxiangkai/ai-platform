@@ -31,7 +31,7 @@ nimbus-jose-jwt = "10.9.1"   # Nimbus JOSE + JWT（ai-auth 直接使用 SignedJW
 jjwt = "0.13.0"              # JJWT（Web Plus Security JWT 签发与校验；升级需验证 Web Plus JWT 兼容性）
 
 # ─────────────────────── 对象映射 ────────────────────────────
-mapstruct-plus = "1.5.1"          # MapStruct Plus 最新已发布稳定版（@AutoMapper 自动生成转换器）
+mapstruct-plus = "1.5.2"          # MapStruct Plus 最新已发布稳定版（@AutoMapper 自动生成转换器）
 lombok-mapstruct-binding = "0.2.0" # 确保 Lombok 在 MapStruct 之前运行的绑定处理器
 
 # ─────────────────────────── 测试 ────────────────────────────────
