@@ -156,11 +156,25 @@ public class DefaultSseOperations implements SseOperations {
             return;
         }
 
+        sendToConnections(userId, userConns, userConns, message);
+    }
+
+    /**
+     * 向指定的用户连接发送消息，并复用统一的失败连接清理语义。
+     *
+     * @param userId 用户标识
+     * @param userConns 当前用户的全部连接，用于更新活跃时间和清理失败连接
+     * @param targetConns 本次实际发送的目标连接
+     * @param message 待发送消息
+     */
+    private void sendToConnections(String userId, CopyOnWriteArrayList<SseConnection> userConns,
+                                   Collection<SseConnection> targetConns, SseMessage<?> message) {
         try {
             String json = objectMapper.writeValueAsString(message);
             List<SseConnection> failedConns = new ArrayList<>();
+            int successCount = 0;
 
-            for (SseConnection conn : userConns) {
+            for (SseConnection conn : targetConns) {
                 if (conn.sink() == null) {
                     failedConns.add(conn);
                     continue;
@@ -176,6 +190,7 @@ public class DefaultSseOperations implements SseOperations {
                     if (idx >= 0) {
                         userConns.set(idx, conn.updateActiveTime());
                     }
+                    successCount++;
                 }
             }
 
@@ -184,7 +199,6 @@ public class DefaultSseOperations implements SseOperations {
                 doDisconnectOne(userId, failed, SseConstants.ConnectionStatus.ERROR);
             }
 
-            int successCount = userConns.size() - failedConns.size();
             if (successCount > 0) {
                 totalMessagesSent.incrementAndGet();
                 eventPublisher.publishEvent(new SseMessageSentEvent(this, message));
@@ -211,13 +225,19 @@ public class DefaultSseOperations implements SseOperations {
     @Override
     public void broadcastToTenant(String tenantId, SseMessage<?> message) {
         if (tenantId == null) return;
-        List<String> tenantUsers = connections.entrySet().stream()
-                .filter(e -> !e.getValue().isEmpty())
-                .filter(e -> e.getValue().stream().anyMatch(c -> tenantId.equals(c.tenantId())))
-                .map(Map.Entry::getKey)
-                .toList();
-        log.info("租户广播: tenantId={}, userCount={}", tenantId, tenantUsers.size());
-        sendToUsers(tenantUsers, message);
+        int tenantUserCount = 0;
+        for (var entry : connections.entrySet()) {
+            String userId = entry.getKey();
+            CopyOnWriteArrayList<SseConnection> userConns = entry.getValue();
+            List<SseConnection> tenantConns = userConns.stream()
+                    .filter(connection -> tenantId.equals(connection.tenantId()))
+                    .toList();
+            if (tenantConns.isEmpty()) continue;
+
+            tenantUserCount++;
+            sendToConnections(userId, userConns, tenantConns, message);
+        }
+        log.info("租户广播: tenantId={}, userCount={}", tenantId, tenantUserCount);
     }
 
     @Override

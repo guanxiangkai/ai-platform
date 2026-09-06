@@ -40,8 +40,11 @@ public interface ISseLogService extends IBaseService<SseLogPageDTO, SseLogPageVO
      * 记录 SSE 连接断开的不可变审计日志
      *
      * @param connectionId     连接唯一标识
+     * @param userId           用户 ID
+     * @param tenantId         租户 ID
      * @param disconnectTime   断开时间
      * @param disconnectReason 断开原因
      */
-    void logDisconnect(String connectionId, LocalDateTime disconnectTime, String disconnectReason);
+    void logDisconnect(String connectionId, String userId, String tenantId,
+                       LocalDateTime disconnectTime, String disconnectReason);
 }

@@ -44,8 +44,8 @@ Netty 事件循环，启用虚拟线程本身不等于消除阻塞。
 ## 技术基线
 
 - Oracle GraalVM 25.0.4
-- Spring Boot 4.1.1
-- Spring Cloud 2025.1.2
+- Spring Boot 4.0.8
+- Spring Cloud 2025.1.3
 - Spring Cloud Alibaba 2025.1.0.0
 - Gradle 9.7.1
 - Jackson 3
@@ -68,6 +68,8 @@ AWS SDK v2 使用 2.54.13；升级验收覆盖 S3 兼容端点、路径风格、
 仓库只声明运行时环境变量契约，不保存 Nacos 地址、命名空间、用户名、密码、数据库连接、Redis/Kafka/S3 凭据、JWT 密钥或真实数据。`application.yml` 中的值由部署环境提供，Gradle 不执行凭据资源替换，因此构建产物不会固化某个环境的连接信息。
 
 `docker/docker-compose.yml` 只是无真实值的参数化编排示例。生产配置、数据库结构与数据迁移由使用方在独立私有交付物中维护，不属于本公开仓库。
+
+Web Plus 接口载荷加密采用显式选择契约：未标注 `@ApiCrypto` 的端点始终使用标准 JSON，继承基础 Controller 不会隐式启用加密。只有调用方实现相同信封协议且端点确有载荷加密要求时，才在具体 JSON 端点标注；Dify、SSE、文件上传下载和其他非 JSON 流量保持未标注。
 
 ## 全链路可观测性
 

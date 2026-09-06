@@ -94,11 +94,14 @@ public class SseLogServiceImpl
     @Async
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void logDisconnect(String connectionId, LocalDateTime disconnectTime, String disconnectReason) {
+    public void logDisconnect(String connectionId, String userId, String tenantId,
+                              LocalDateTime disconnectTime, String disconnectReason) {
         try {
             SseLog entry = new SseLog();
             entry.setOperationType(SseOperationType.DISCONNECT);
             entry.setConnectionId(connectionId);
+            entry.setUserId(userId);
+            entry.setTenantId(tenantId);
             entry.setStatus("SUCCESS");
             entry.setLogTime(disconnectTime != null ? disconnectTime : LocalDateTime.now());
             entry.setDescription("SSE 连接断开：" + disconnectReason);
