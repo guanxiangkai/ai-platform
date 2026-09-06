@@ -45,7 +45,7 @@ public class OpenAiCompatibleAgentClient implements AgentProviderClient {
         invocation.history().forEach(message -> messages.addObject()
                 .put("role", message.role())
                 .put("content", message.content()));
-        messages.addObject().put("role", AgentMessageRole.USER.value()).put("content", request.message());
+        messages.addObject().put("role", AgentMessageRole.USER.value()).put("content", invocation.message());
         JsonNode response = webClientBuilder.build().post().uri(endpoint(definition.getEndpointUrl()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + definition.getCredential())
                 .header(AgentApiHeaders.IDEMPOTENCY_KEY, invocation.invocationId())

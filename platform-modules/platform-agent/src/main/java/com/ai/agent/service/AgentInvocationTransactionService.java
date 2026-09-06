@@ -168,7 +168,10 @@ class AgentInvocationTransactionService {
         return result(call, session, assistant);
     }
 
-    /** 仅允许当前执行令牌把调用收敛为失败并释放会话。 */
+    /**
+     * 仅允许当前执行令牌把调用收敛为失败并释放会话。
+     * 异常仅记录类型，避免把第三方响应正文、私有地址或凭据线索持久化到调用记录。
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void fail(
             Reservation reservation, RuntimeException exception, long latencyMs) {
@@ -186,7 +189,7 @@ class AgentInvocationTransactionService {
                 AgentInvocationState.FAILED,
                 latencyMs,
                 exception.getClass().getSimpleName(),
-                limit(safeMessage(exception), AgentCallRecord.ERROR_MESSAGE_MAX_LENGTH)
+                "智能体调用失败"
         );
         if (changed != 1) {
             return;
@@ -351,10 +354,6 @@ class AgentInvocationTransactionService {
 
     private String trim(String value, String fallback) {
         return StringUtils.hasText(value) ? value.trim() : fallback;
-    }
-
-    private String safeMessage(Throwable value) {
-        return StringUtils.hasText(value.getMessage()) ? value.getMessage() : value.getClass().getSimpleName();
     }
 
     private String limit(String value, int max) {
