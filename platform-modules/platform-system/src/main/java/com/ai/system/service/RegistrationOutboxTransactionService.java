@@ -1,5 +1,6 @@
 package com.ai.system.service;
 
+import com.ai.api.security.PasswordDigestProtocol;
 import com.ai.system.config.RegisterOutboxProperties;
 import com.ai.system.domain.OutboxDeliveryState;
 import com.ai.system.domain.RegistrationProvisioningPolicy;
@@ -53,6 +54,12 @@ public class RegistrationOutboxTransactionService {
         if (record == null || (record.getRegistrationState() != RegisterState.PROVISIONING
                 && record.getRegistrationState() != RegisterState.PROVISIONING_FAILED)) {
             event.setDeliveryState(OutboxDeliveryState.DEAD);
+            return null;
+        }
+        if (!PasswordDigestProtocol.isBcryptHash(record.getPassword())) {
+            event.setDeliveryState(OutboxDeliveryState.DEAD);
+            record.setRegistrationState(RegisterState.PROVISIONING_FAILED);
+            record.setProvisioningError("注册密码协议无效");
             return null;
         }
         return record;

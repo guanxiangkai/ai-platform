@@ -20,7 +20,7 @@ public interface IAuthService {
     /**
      * 用户登录
      *
-     * @param request 登录请求
+     * @param request 登录请求，密码字段必须为客户端生成的 SHA-1 小写十六进制摘要
      * @param exchange 当前 HTTP 交换上下文
      * @return 登录响应（包含Token）
      */

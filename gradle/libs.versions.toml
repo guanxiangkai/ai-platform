@@ -47,7 +47,7 @@ web-plus-error = "2.0.1"
 web-plus-web = "6.0.0"
 web-plus-security = "1.0.4"
 web-plus-protection = "2.0.1"
-web-plus-log = "2.0.1"
+web-plus-log = "2.0.2"
 web-plus-mq = "1.1.1"
 web-plus-dict = "1.0.3"
 jpa-plus-core = "1.0.2"
@@ -178,6 +178,7 @@ poi-scratchpad = { group = "org.apache.poi", name = "poi-scratchpad", version.re
 spring-security-core = { group = "org.springframework.security", name = "spring-security-core" }
 spring-security-web = { group = "org.springframework.security", name = "spring-security-web" }
 spring-security-config = { group = "org.springframework.security", name = "spring-security-config" }
+spring-security-crypto = { group = "org.springframework.security", name = "spring-security-crypto" }
 spring-boot-starter-security = { group = "org.springframework.boot", name = "spring-boot-starter-security" }
 
 # ═══════════════════════════ 缓存 ═══════════════════════════

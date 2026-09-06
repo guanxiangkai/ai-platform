@@ -69,7 +69,7 @@ public class AuthServiceImpl implements IAuthService {
         ServerHttpRequest serverRequest = exchange.getRequest();
         return Mono.fromRunnable(() -> authProtectionService.assertLoginAllowed(request.username(), serverRequest))
                 .subscribeOn(Schedulers.boundedElastic())
-                .then(loadLoginUser(request.username(), request.password(), serverRequest))
+                .then(loadLoginUser(request.username(), request.passwordDigest(), serverRequest))
                 .flatMap(user -> rotateTokenVersion(user).map(user::withTokenVersion))
                 .flatMap(user -> generateTokensAndResponse(user))
                 .doOnNext(response -> authProtectionService.recordLoginSuccess(request.username(), serverRequest))

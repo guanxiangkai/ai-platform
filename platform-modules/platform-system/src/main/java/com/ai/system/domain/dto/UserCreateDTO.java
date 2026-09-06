@@ -1,6 +1,8 @@
 package com.ai.system.domain.dto;
 
+import com.ai.api.security.PasswordDigestProtocol;
 import com.ai.system.domain.entity.User;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.linpeilie.annotations.AutoMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
@@ -24,7 +26,7 @@ public record UserCreateDTO(
         @Schema(description = "备注") String remark,
         @Schema(description = "排序号") Integer sortOrder,
         @Schema(description = "用户名", requiredMode = Schema.RequiredMode.REQUIRED) @NotBlank(message = "用户名不能为空") @Size(min = 2, max = 64, message = "用户名长度为2-64个字符") String username,
-        @Schema(description = "密码", requiredMode = Schema.RequiredMode.REQUIRED) @NotBlank(message = "密码不能为空") @Size(min = 6, max = 64, message = "密码长度为6-64个字符") String password,
+        @Schema(description = "UTF-8原始密码的SHA-1小写十六进制摘要", requiredMode = Schema.RequiredMode.REQUIRED, accessMode = Schema.AccessMode.WRITE_ONLY) @NotBlank(message = "密码摘要不能为空") @Pattern(regexp = PasswordDigestProtocol.DIGEST_REGEX, message = "密码摘要必须为40位小写SHA-1十六进制字符串") @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) String passwordDigest,
         @Schema(description = "昵称") @Size(max = 64, message = "昵称长度不能超过64个字符") String nickname,
         @Schema(description = "真实姓名") @Size(max = 64, message = "真实姓名长度不能超过64个字符") String realName,
         @Schema(description = "邮箱") @Email(message = "邮箱格式不正确") @Size(max = 128, message = "邮箱长度不能超过128个字符") String email,
@@ -37,4 +39,9 @@ public record UserCreateDTO(
 ) implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
+
+    @Override
+    public String toString() {
+        return "UserCreateDTO[username=" + username + ", passwordDigest=[REDACTED]]";
+    }
 }

@@ -90,6 +90,36 @@ class RegistrationOutboxTransactionServiceTest {
     }
 
     @Test
+    void claimShouldRejectAProvisioningRecordWithCustomMarker() {
+        RegistrationOutbox event = event(OutboxDeliveryState.PENDING);
+        Register record = record(RegisterState.PROVISIONING);
+        record.setPassword("{sha1-bcrypt}$2b$12$" + "A".repeat(53));
+        when(outboxRepository.findLockedById(event.getId())).thenReturn(Optional.of(event));
+        when(registerRepository.findLockedById(event.getAggregateId())).thenReturn(Optional.of(record));
+
+        assertThat(service.claim(event.getId())).isNull();
+
+        assertThat(event.getDeliveryState()).isEqualTo(OutboxDeliveryState.DEAD);
+        assertThat(record.getRegistrationState()).isEqualTo(RegisterState.PROVISIONING_FAILED);
+        assertThat(record.getProvisioningError()).isEqualTo("注册密码协议无效");
+    }
+
+    @Test
+    void claimShouldRejectAProvisioningRecordWithUnsupportedBcryptCost() {
+        RegistrationOutbox event = event(OutboxDeliveryState.PENDING);
+        Register record = record(RegisterState.PROVISIONING);
+        record.setPassword("$2b$32$" + "A".repeat(53));
+        when(outboxRepository.findLockedById(event.getId())).thenReturn(Optional.of(event));
+        when(registerRepository.findLockedById(event.getAggregateId())).thenReturn(Optional.of(record));
+
+        assertThat(service.claim(event.getId())).isNull();
+
+        assertThat(event.getDeliveryState()).isEqualTo(OutboxDeliveryState.DEAD);
+        assertThat(record.getRegistrationState()).isEqualTo(RegisterState.PROVISIONING_FAILED);
+        assertThat(record.getProvisioningError()).isEqualTo("注册密码协议无效");
+    }
+
+    @Test
     void activateShouldAssignRoleOnceEnableUserAndFinalizeTheState() {
         RegistrationOutbox event = event(OutboxDeliveryState.PROCESSING);
         Register record = record(RegisterState.PROVISIONING);
@@ -179,6 +209,7 @@ class RegistrationOutboxTransactionServiceTest {
         record.setId("register-1");
         record.setDirectorySubjectId("subject-1");
         record.setUserId("user-1");
+        record.setPassword("$2b$12$" + "A".repeat(53));
         record.setRegistrationState(state);
         return record;
     }
