@@ -242,12 +242,13 @@ public class DefaultSseOperations implements SseOperations {
     /**
      * 向所有在线连接发送心跳（由定时任务调用）
      * <p>
-     * 发送 SSE 注释事件作为 keepalive，防止代理/防火墙断开连接。
+     * 发送 heartbeat 消息作为 keepalive，防止代理/防火墙断开连接。
      * 心跳成功会更新 {@code lastActiveTime}，失败则断开连接。
      * </p>
      *
      * @return 成功发送心跳的连接数
      */
+    @Override
     public int sendHeartbeatToAll() {
         int successCount = 0;
         List<Map.Entry<String, SseConnection>> failedEntries = new ArrayList<>();
@@ -300,6 +301,7 @@ public class DefaultSseOperations implements SseOperations {
      *
      * @return 被清理的连接数
      */
+    @Override
     public int cleanupExpiredConnections() {
         List<Map.Entry<String, SseConnection>> expiredEntries = new ArrayList<>();
 

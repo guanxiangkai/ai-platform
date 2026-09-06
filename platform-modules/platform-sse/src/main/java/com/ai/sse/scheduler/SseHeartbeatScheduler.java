@@ -1,7 +1,6 @@
 package com.ai.sse.scheduler;
 
 import com.ai.sse.config.SseProperties;
-import com.ai.sse.core.DefaultSseOperations;
 import com.ai.sse.core.SseOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,6 +27,11 @@ public class SseHeartbeatScheduler {
 
     private final SseOperations sseOperations;
 
+    /**
+     * 创建调用连接维护契约的调度器。
+     *
+     * @param sseOperations 本实例使用的 SSE 操作实现
+     */
     public SseHeartbeatScheduler(SseOperations sseOperations) {
         this.sseOperations = sseOperations;
     }
@@ -37,14 +41,11 @@ public class SseHeartbeatScheduler {
      */
     @Scheduled(fixedDelayString = "${ai.sse.heartbeat-interval:30000}")
     public void sendHeartbeat() {
-        if (!(sseOperations instanceof DefaultSseOperations ops)) {
-            return;
-        }
-        int onlineCount = ops.getOnlineCount();
+        int onlineCount = sseOperations.getOnlineCount();
         if (onlineCount == 0) {
             return;
         }
-        int success = ops.sendHeartbeatToAll();
+        int success = sseOperations.sendHeartbeatToAll();
         log.debug("[SSE-Heartbeat] 心跳完成: success={}, onlineUsers={}", success, onlineCount);
     }
 }

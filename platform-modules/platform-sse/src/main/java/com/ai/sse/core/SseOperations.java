@@ -34,6 +34,27 @@ public interface SseOperations {
 
     int getOnlineCountByTenant(String tenantId);
 
+    // ==================== 连接维护 ====================
+
+    /**
+     * 向本实例的全部在线连接发送心跳，并回收发送失败的连接。
+     *
+     * <p>调度器通过此契约调用所有实现；替换实现时必须保留连接维护语义，
+     * 不得把心跳广播到其他实例。实现需允许连接同时建立、取消和发送消息。</p>
+     *
+     * @return 成功发送心跳的连接数，同一用户的多个连接分别计数
+     */
+    int sendHeartbeatToAll();
+
+    /**
+     * 按实现配置的超时策略回收本实例的过期连接。
+     *
+     * <p>实现需允许与连接建立、心跳和断开并发执行，重复清理不得重复释放资源。</p>
+     *
+     * @return 本次清理的连接数
+     */
+    int cleanupExpiredConnections();
+
     // ==================== 消息发送 ====================
 
     void sendToUser(String userId, SseMessage<?> message);
