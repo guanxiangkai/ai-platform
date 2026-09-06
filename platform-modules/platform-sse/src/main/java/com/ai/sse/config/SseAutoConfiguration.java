@@ -162,11 +162,9 @@ public class SseAutoConfiguration {
          */
         @Scheduled(fixedDelayString = "${ai.sse.cleanup-interval:60000}")
         public void cleanup() {
-            if (sseOperations instanceof DefaultSseOperations ops) {
-                int cleaned = ops.cleanupExpiredConnections();
-                if (cleaned > 0) {
-                    log.info("[SSE-Cleanup] 清理超时连接: count={}", cleaned);
-                }
+            int cleaned = sseOperations.cleanupExpiredConnections();
+            if (cleaned > 0) {
+                log.info("[SSE-Cleanup] 清理超时连接: count={}", cleaned);
             }
         }
     }
