@@ -18,10 +18,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.jdbc.core.ConnectionCallback;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.sql.PreparedStatement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -51,6 +55,7 @@ public class SseConnectionRecordServiceImpl
 
     private final SseConnectionRecordRepository repository;
     private final SseProperties properties;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     protected BaseRepository<SseConnectionRecordPageVO, SseConnectionRecordVO, SseConnectionRecord> getRepository() {
@@ -79,10 +84,13 @@ public class SseConnectionRecordServiceImpl
 
     @Async
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, timeout = 5)
     public void logConnect(String connectionId, String userId, String tenantId,
                            LocalDateTime connectTime, String clientIp) {
-        try {
+        acquireLifecycleLock(tenantId, connectionId);
+        repository.findByTenantIdAndConnectionIdAndDeletedFalse(tenantId, connectionId)
+                .ifPresentOrElse(record -> completeMissingMetadata(
+                        record, userId, connectTime, clientIp), () -> {
             SseConnectionRecord record = new SseConnectionRecord();
             record.setConnectionId(connectionId);
             record.setUserId(userId);
@@ -94,35 +102,26 @@ public class SseConnectionRecordServiceImpl
 
             repository.save(record);
             log.debug("[SSE-Audit] 连接记录已创建: userId={}, connId={}", userId, connectionId);
-        } catch (Exception e) {
-            log.error("[SSE-Audit] 记录连接失败: userId={}, connId={}", userId, connectionId, e);
-        }
+        });
     }
 
     @Async
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void logDisconnect(String connectionId, LocalDateTime disconnectTime, String disconnectReason) {
-        try {
-            repository.findByConnectionIdAndDeletedFalse(connectionId)
-                    .ifPresentOrElse(record -> {
-                        record.setConnectionStatus(disconnectReason);
-                        record.setDisconnectTime(disconnectTime);
-                        record.setDisconnectReason(disconnectReason);
-
-                        // 计算连接持续时长
-                        if (record.getConnectTime() != null) {
-                            long seconds = ChronoUnit.SECONDS.between(record.getConnectTime(), disconnectTime);
-                            record.setDurationSeconds(Math.max(0, seconds));
-                        }
-
-                        repository.save(record);
-                        log.debug("[SSE-Audit] 连接断开已记录: connId={}, reason={}, duration={}s",
-                                connectionId, disconnectReason, record.getDurationSeconds());
-                    }, () -> log.warn("[SSE-Audit] 断开时未找到连接记录: connId={}", connectionId));
-        } catch (Exception e) {
-            log.error("[SSE-Audit] 记录断开失败: connId={}", connectionId, e);
-        }
+    @Transactional(rollbackFor = Exception.class, timeout = 5)
+    public void logDisconnect(String connectionId, String userId, String tenantId,
+                              LocalDateTime connectTime, LocalDateTime disconnectTime,
+                              String disconnectReason) {
+        acquireLifecycleLock(tenantId, connectionId);
+        repository.findByTenantIdAndConnectionIdAndDeletedFalse(tenantId, connectionId)
+                .ifPresentOrElse(record -> recordDisconnect(record, disconnectTime, disconnectReason), () -> {
+                    SseConnectionRecord record = new SseConnectionRecord();
+                    record.setConnectionId(connectionId);
+                    record.setUserId(userId);
+                    record.setTenantId(tenantId);
+                    record.setConnectTime(connectTime);
+                    record.setServerInstance(getServerInstance());
+                    recordDisconnect(record, disconnectTime, disconnectReason);
+                });
     }
 
     // ==================== 查询统计 ====================
@@ -158,6 +157,67 @@ public class SseConnectionRecordServiceImpl
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 以租户和连接标识获取 PostgreSQL 事务级咨询锁。
+     *
+     * <p>锁在当前 {@code @Transactional} 事务提交或回滚时自动释放，保证异步连接和断开事件
+     * 在同一生命周期键上串行，不会因进程重启遗留锁。</p>
+     */
+    private void acquireLifecycleLock(String tenantId, String connectionId) {
+        String lockKey = lengthPrefixedKey(tenantId, connectionId);
+        jdbcTemplate.execute((ConnectionCallback<Void>) connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(CAST(? AS text), 0))")) {
+                statement.setQueryTimeout(5);
+                statement.setString(1, lockKey);
+                statement.execute();
+            }
+            return null;
+        });
+    }
+
+    private String lengthPrefixedKey(String tenantId, String connectionId) {
+        return tenantId.length() + ":" + tenantId + connectionId.length() + ":" + connectionId;
+    }
+
+    private void completeMissingMetadata(
+            SseConnectionRecord record, String userId, LocalDateTime connectTime, String clientIp) {
+        boolean changed = false;
+        if (!StringUtils.hasText(record.getUserId()) && StringUtils.hasText(userId)) {
+            record.setUserId(userId);
+            changed = true;
+        }
+        if (record.getConnectTime() == null && connectTime != null) {
+            record.setConnectTime(connectTime);
+            changed = true;
+        }
+        if (!StringUtils.hasText(record.getClientIp()) && StringUtils.hasText(clientIp)) {
+            record.setClientIp(clientIp);
+            changed = true;
+        }
+        if (!StringUtils.hasText(record.getServerInstance())) {
+            record.setServerInstance(getServerInstance());
+            changed = true;
+        }
+        if (changed) repository.save(record);
+    }
+
+    private void recordDisconnect(
+            SseConnectionRecord record, LocalDateTime disconnectTime, String disconnectReason) {
+        if (StringUtils.hasText(record.getConnectionStatus())
+                && !SseConstants.ConnectionStatus.CONNECTED.equals(record.getConnectionStatus())) return;
+        record.setConnectionStatus(disconnectReason);
+        record.setDisconnectTime(disconnectTime);
+        record.setDisconnectReason(disconnectReason);
+        if (record.getConnectTime() != null) {
+            long seconds = ChronoUnit.SECONDS.between(record.getConnectTime(), disconnectTime);
+            record.setDurationSeconds(Math.max(0, seconds));
+        }
+        repository.save(record);
+        log.debug("[SSE-Audit] 连接断开已记录: connId={}, reason={}, duration={}s",
+                record.getConnectionId(), disconnectReason, record.getDurationSeconds());
+    }
 
 
     /**

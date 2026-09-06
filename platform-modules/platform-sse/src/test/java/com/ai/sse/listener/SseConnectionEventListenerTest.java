@@ -28,6 +28,10 @@ class SseConnectionEventListenerTest {
 
         listener.onDisconnect(new SseDisconnectEvent(this, connection));
 
+        verify(connectionRecordService).logDisconnect(
+                eq("connection-1"), eq("user-1"), eq("tenant-1"),
+                eq(connection.connectTime()), any(LocalDateTime.class),
+                eq(SseConstants.ConnectionStatus.DISCONNECTED));
         verify(sseLogService).logDisconnect(
                 eq("connection-1"), eq("user-1"), eq("tenant-1"), any(LocalDateTime.class),
                 eq(SseConstants.ConnectionStatus.DISCONNECTED));

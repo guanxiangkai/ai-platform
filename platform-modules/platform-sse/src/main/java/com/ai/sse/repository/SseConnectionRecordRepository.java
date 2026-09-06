@@ -20,9 +20,10 @@ public interface SseConnectionRecordRepository
         extends BaseRepository<SseConnectionRecordPageVO, SseConnectionRecordVO, SseConnectionRecord> {
 
     /**
-     * 根据连接 ID 查询（用于断开时更新）
+     * 根据租户和连接 ID 查询（用于连接生命周期状态收敛）。
      */
-    Optional<SseConnectionRecord> findByConnectionIdAndDeletedFalse(String connectionId);
+    Optional<SseConnectionRecord> findByTenantIdAndConnectionIdAndDeletedFalse(
+            String tenantId, String connectionId);
 
     /**
      * 查询用户的连接记录（按连接时间倒序）

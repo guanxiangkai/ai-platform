@@ -14,6 +14,8 @@ dependencies {
     implementation(libs.mapstruct.plus.spring.boot.starter)
     implementation(libs.jpa.plus.starter)
     runtimeOnly(libs.postgresql)
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
 
     // ===== 服务 API 契约（HTTP Interface 客户端）=====
     implementation(project(":platform-api:platform-system-api"))
