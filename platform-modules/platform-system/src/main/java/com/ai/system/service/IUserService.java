@@ -22,20 +22,20 @@ public interface IUserService extends IBaseService<UserPageDTO, UserPageVO, User
      * 修改用户密码
      *
      * @param id          用户ID
-     * @param oldPasswordDigest 旧密码的 SHA-1 小写十六进制摘要
-     * @param newPasswordDigest 新密码的 SHA-1 小写十六进制摘要
+     * @param oldPassword 旧密码的 SHA-1 小写十六进制摘要
+     * @param newPassword 新密码的 SHA-1 小写十六进制摘要
      * @return 是否成功
      */
-    Boolean changePassword(String id, String oldPasswordDigest, String newPasswordDigest);
+    Boolean changePassword(String id, String oldPassword, String newPassword);
 
     /**
      * 重置用户密码
      *
      * @param id 用户ID
-     * @param newPasswordDigest 管理端本地生成新密码的 SHA-1 小写十六进制摘要
+     * @param newPassword 管理端本地生成新密码的 SHA-1 小写十六进制摘要
      * @return 是否重置成功
      */
-    Boolean resetPassword(String id, String newPasswordDigest);
+    Boolean resetPassword(String id, String newPassword);
 
     /**
      * 检查用户名是否可用

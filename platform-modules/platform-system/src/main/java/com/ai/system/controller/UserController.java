@@ -57,7 +57,7 @@ public class UserController extends BaseController<UserPageDTO, UserPageVO, User
         if (currentUserId == null) {
             return ApiResponse.fail("用户未登录");
         }
-        return ApiResponse.ok(service.changePassword(currentUserId, request.oldPasswordDigest(), request.newPasswordDigest()));
+        return ApiResponse.ok(service.changePassword(currentUserId, request.oldPassword(), request.newPassword()));
     }
 
     /**
@@ -74,7 +74,7 @@ public class UserController extends BaseController<UserPageDTO, UserPageVO, User
     public ApiResponse<Boolean> resetPassword(
             @RequestParam String id,
             @Valid @RequestBody ResetPasswordRequest request) {
-        return ApiResponse.ok(service.resetPassword(id, request.newPasswordDigest()));
+        return ApiResponse.ok(service.resetPassword(id, request.newPassword()));
     }
 
     /**

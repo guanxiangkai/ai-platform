@@ -70,7 +70,7 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
         validateUserUniqueness(dto.username(), dto.email(), dto.phone(), null);
 
         User user = EntityConverter.toEntity(dto, User.class);
-        user.setPassword(passwordEncoder.encode(dto.passwordDigest()));
+        user.setPassword(passwordEncoder.encode(dto.password()));
         applyAdminFields(user, dto.userType(), false);
         User saved = repository.save(user);
 
@@ -118,8 +118,8 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
             user.setSortOrder(dto.sortOrder());
         }
 
-        if (StringUtils.hasText(dto.passwordDigest())) {
-            user.setPassword(passwordEncoder.encode(dto.passwordDigest()));
+        if (StringUtils.hasText(dto.password())) {
+            user.setPassword(passwordEncoder.encode(dto.password()));
         }
 
         repository.save(user);
@@ -393,16 +393,16 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Boolean changePassword(String id, String oldPasswordDigest, String newPasswordDigest) {
+    public Boolean changePassword(String id, String oldPassword, String newPassword) {
         User user = repository.findById(id)
                 .orElseThrow(() -> BizException.notFound("用户不存在"));
 
-        if (!passwordEncoder.matches(oldPasswordDigest, user.getPassword())) {
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             log.warn("旧密码错误: id={}", id);
             return false;
         }
 
-        user.setPassword(passwordEncoder.encode(newPasswordDigest));
+        user.setPassword(passwordEncoder.encode(newPassword));
         repository.save(user);
         authUserCacheService.refreshAfterCommit(id, null, true);
         return true;
@@ -410,11 +410,11 @@ public class UserServiceImpl extends BaseServiceImpl<UserPageDTO, UserPageVO, Us
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Boolean resetPassword(String id, String newPasswordDigest) {
+    public Boolean resetPassword(String id, String newPassword) {
         User user = repository.findById(id)
                 .orElseThrow(() -> BizException.notFound("用户不存在"));
 
-        user.setPassword(passwordEncoder.encode(newPasswordDigest));
+        user.setPassword(passwordEncoder.encode(newPassword));
         repository.save(user);
         authUserCacheService.refreshAfterCommit(id, null, true);
         return true;

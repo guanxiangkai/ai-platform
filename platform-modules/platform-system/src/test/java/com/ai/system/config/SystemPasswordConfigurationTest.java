@@ -1,6 +1,6 @@
 package com.ai.system.config;
 
-import com.ai.api.security.ProtocolPasswordEncoder;
+import io.github.guanxiangkai.web.plus.security.password.ProtocolPasswordEncoder;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;

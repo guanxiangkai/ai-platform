@@ -9,6 +9,9 @@ import org.mockito.Mockito;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.json.JsonMapper;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class AuthControllerTest {
 
@@ -33,7 +36,7 @@ class AuthControllerTest {
                 .bodyValue("""
                         {
                           "username": "admin",
-                          "passwordDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                          "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                         }
                         """)
                 .exchange()
@@ -55,7 +58,7 @@ class AuthControllerTest {
                 .bodyValue("""
                         {
                           "username": "admin",
-                          "passwordDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                          "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                         }
                         """)
                 .exchange()
@@ -71,11 +74,36 @@ class AuthControllerTest {
                 .uri("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
-                        { "username": "admin", "passwordDigest": "raw-password" }
+                        { "username": "admin", "password": "raw-password" }
                         """)
                 .exchange()
                 .expectStatus().isBadRequest();
 
         Mockito.verifyNoInteractions(authService);
+    }
+
+    @Test
+    void shouldRequirePasswordFieldInsteadOfDigestAlias() {
+        webTestClient.post()
+                .uri("/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"username":"admin","passwordDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest();
+        Mockito.verifyNoInteractions(authService);
+    }
+
+    @Test
+    void passwordShouldBeWriteOnlyAndExcludedFromLogs() {
+        String password = "a".repeat(40);
+        var mapper = JsonMapper.builder().build();
+        LoginRequest request = mapper.readValue(
+                "{\"username\":\"admin\",\"password\":\"" + password + "\"}", LoginRequest.class);
+
+        assertThat(request.password()).isEqualTo(password);
+        assertThat(mapper.writeValueAsString(request)).doesNotContain(password, "\"password\"");
+        assertThat(request.toString()).doesNotContain(password).contains("password=[REDACTED]");
     }
 }

@@ -1,7 +1,7 @@
 package com.ai.system.service.impl;
 
-import com.ai.api.security.PasswordDigestProtocol;
-import com.ai.api.security.ProtocolPasswordEncoder;
+import io.github.guanxiangkai.web.plus.security.password.PasswordProtocol;
+import io.github.guanxiangkai.web.plus.security.password.ProtocolPasswordEncoder;
 import com.ai.system.repository.PostRepository;
 import com.ai.system.repository.RoleRepository;
 import com.ai.system.repository.UserPostRepository;
@@ -27,8 +27,8 @@ class UserPasswordProtocolTest {
     @Test
     void changePasswordAcceptsDigestAndRejectsRawValue() {
         ProtocolPasswordEncoder encoder = new ProtocolPasswordEncoder();
-        String oldDigest = PasswordDigestProtocol.sha1Utf8("old-password");
-        String newDigest = PasswordDigestProtocol.sha1Utf8("new-password");
+        String oldDigest = PasswordProtocol.sha1Utf8("old-password");
+        String newDigest = PasswordProtocol.sha1Utf8("new-password");
         User user = new User();
         user.setId("user-1");
         user.setPassword(encoder.encode(oldDigest));
@@ -44,7 +44,7 @@ class UserPasswordProtocolTest {
     @Test
     void resetPasswordStoresSubmittedDigestWithoutReturningPassword() {
         ProtocolPasswordEncoder encoder = new ProtocolPasswordEncoder();
-        String resetDigest = PasswordDigestProtocol.sha1Utf8("admin-local-random-password");
+        String resetDigest = PasswordProtocol.sha1Utf8("admin-local-random-password");
         User user = new User();
         user.setId("user-1");
         UserRepository repository = mock(UserRepository.class);
