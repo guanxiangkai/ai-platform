@@ -1,6 +1,6 @@
 package com.ai.system.config;
 
-import com.ai.api.security.ProtocolPasswordEncoder;
+import io.github.guanxiangkai.web.plus.security.password.ProtocolPasswordEncoder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;

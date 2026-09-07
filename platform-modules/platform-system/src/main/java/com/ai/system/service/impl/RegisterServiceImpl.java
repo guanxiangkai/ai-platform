@@ -34,7 +34,7 @@ import com.ai.system.integration.TenantDirectoryClient;
 import com.ai.system.security.AuthUserCacheService;
 import com.ai.system.service.IRegisterService;
 import com.ai.system.service.RegistrationSubmissionTransactionService;
-import com.ai.api.security.PasswordDigestProtocol;
+import io.github.guanxiangkai.web.plus.security.password.PasswordProtocol;
 import io.github.guanxiangkai.web.plus.web.util.SpecUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -152,7 +152,7 @@ public class RegisterServiceImpl
         // 6. 构建并保存注册记录
         Register record = new Register();
         record.setRealName(dto.realName());
-        record.setPassword(passwordEncoder.encode(dto.passwordDigest()));
+        record.setPassword(passwordEncoder.encode(dto.password()));
         record.setNickname(dto.nickname());
         record.setEmail(dto.email());
         record.setPhone(dto.phone());
@@ -190,7 +190,7 @@ public class RegisterServiceImpl
         record.setAuditRemark(auditRemark);
 
         if (Boolean.TRUE.equals(approved)) {
-            if (!PasswordDigestProtocol.isBcryptHash(record.getPassword())) {
+            if (!PasswordProtocol.isBcryptHash(record.getPassword())) {
                 throw new BizException("注册密码不是当前SHA-1摘要 BCrypt 协议，不能审核开通");
             }
             record.setRegistrationState(RegisterState.PROVISIONING);

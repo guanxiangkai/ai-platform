@@ -1,8 +1,9 @@
 package com.ai.system.domain.dto;
 
-import com.ai.api.security.PasswordDigestProtocol;
+import io.github.guanxiangkai.web.plus.security.password.PasswordProtocol;
 import com.ai.system.domain.entity.User;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.github.linpeilie.annotations.AutoMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Pattern;
@@ -24,7 +25,7 @@ public record UserDTO(
         @Schema(description = "备注") String remark,
         @Schema(description = "排序号") Integer sortOrder,
         @Schema(description = "用户名", requiredMode = Schema.RequiredMode.REQUIRED) String username,
-        @Schema(description = "可选的新密码SHA-1小写十六进制摘要", accessMode = Schema.AccessMode.WRITE_ONLY) @Pattern(regexp = PasswordDigestProtocol.DIGEST_REGEX, message = "密码摘要必须为40位小写SHA-1十六进制字符串") @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) String passwordDigest,
+        @Schema(description = "可选的新密码SHA-1小写十六进制摘要", accessMode = Schema.AccessMode.WRITE_ONLY) @Pattern(regexp = PasswordProtocol.PASSWORD_PATTERN, message = "密码摘要必须为40位小写SHA-1十六进制字符串") @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) String password,
         @Schema(description = "昵称") String nickname,
         @Schema(description = "真实姓名") String realName,
         @Schema(description = "邮箱") String email,
@@ -38,8 +39,22 @@ public record UserDTO(
     @Serial
     private static final long serialVersionUID = 1L;
 
+    /**
+     * 拒绝不能生效的密码字段，避免可选密码更新被静默忽略。
+     *
+     * @param field 未绑定的 JSON 字段名
+     * @param ignored 未使用的值，不能写入异常或日志
+     */
+    @JsonAnySetter
+    @Schema(hidden = true)
+    public void validateUnboundField(String field, Object ignored) {
+        if ("passwordDigest".equals(field)) {
+            throw new IllegalArgumentException("密码字段必须使用password");
+        }
+    }
+
     @Override
     public String toString() {
-        return "UserDTO[id=" + id + ", username=" + username + ", passwordDigest=[REDACTED]]";
+        return "UserDTO[id=" + id + ", username=" + username + ", password=[REDACTED]]";
     }
 }

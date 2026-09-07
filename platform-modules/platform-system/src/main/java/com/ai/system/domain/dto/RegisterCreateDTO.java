@@ -1,6 +1,6 @@
 package com.ai.system.domain.dto;
 
-import com.ai.api.security.PasswordDigestProtocol;
+import io.github.guanxiangkai.web.plus.security.password.PasswordProtocol;
 import com.ai.system.domain.entity.Register;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.linpeilie.annotations.AutoMapper;
@@ -34,9 +34,9 @@ public record RegisterCreateDTO(
 
         @Schema(description = "UTF-8原始密码的SHA-1小写十六进制摘要", requiredMode = Schema.RequiredMode.REQUIRED, accessMode = Schema.AccessMode.WRITE_ONLY)
         @NotBlank(message = "密码摘要不能为空")
-        @Pattern(regexp = PasswordDigestProtocol.DIGEST_REGEX, message = "密码摘要必须为40位小写SHA-1十六进制字符串")
+        @Pattern(regexp = PasswordProtocol.PASSWORD_PATTERN, message = "密码摘要必须为40位小写SHA-1十六进制字符串")
         @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-        String passwordDigest,
+        String password,
 
         @Schema(description = "部门ID", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请选择所在部门")
@@ -64,6 +64,6 @@ public record RegisterCreateDTO(
 
     @Override
     public String toString() {
-        return "RegisterCreateDTO[realName=" + realName + ", passwordDigest=[REDACTED], deptId=" + deptId + "]";
+        return "RegisterCreateDTO[realName=" + realName + ", password=[REDACTED], deptId=" + deptId + "]";
     }
 }

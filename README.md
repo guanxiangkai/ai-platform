@@ -71,9 +71,11 @@ AWS SDK v2 使用 2.54.13；升级验收覆盖 S3 兼容端点、路径风格、
 
 Web Plus 接口载荷加密采用显式选择契约：未标注 `@ApiCrypto` 的端点始终使用标准 JSON，继承基础 Controller 不会隐式启用加密。只有调用方实现相同信封协议且端点确有载荷加密要求时，才在具体 JSON 端点标注；Dify、SSE、文件上传下载和其他非 JSON 流量保持未标注。
 
-账户接口使用 `passwordDigest` 字段传递 UTF-8 密码的 40 位小写 SHA-1 摘要，
+账户接口使用 `password` 字段传递 UTF-8 密码的 40 位小写 SHA-1 摘要，
 空密码摘要、明文密码和 BCrypt 存储值均不是合法输入。服务端使用标准 BCrypt 存储摘要，
 登录、注册、开通、改密和重置密码遵循同一协议。摘要属于密码等效凭据，传输仍须使用 HTTPS。
+改密和重置接口使用 `oldPassword`、`newPassword`；输入校验与 BCrypt 编码复用
+Web Plus Security 的 `PasswordProtocol` 和 `ProtocolPasswordEncoder`，平台只负责显式装配和业务编排。
 
 `POST /agent/session/ask/stream` 返回 `start`、`delta`、`replace`、`complete` 或 `error` 事件。
 Dify 适配器处理真实增量与全文替换；OpenAI-compatible 适配器当前返回单个完成结果，

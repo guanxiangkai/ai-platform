@@ -5,8 +5,8 @@ import com.ai.auth.domain.dto.LoginRequest;
 import com.ai.auth.properties.AuthSuperAdminProperties;
 import com.ai.auth.properties.JwtProperties;
 import com.ai.auth.service.AuthProtectionService;
-import com.ai.api.security.PasswordDigestProtocol;
-import com.ai.api.security.ProtocolPasswordEncoder;
+import io.github.guanxiangkai.web.plus.security.password.PasswordProtocol;
+import io.github.guanxiangkai.web.plus.security.password.ProtocolPasswordEncoder;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -40,8 +40,8 @@ class AuthServiceImplTest {
         AuthProtectionService authProtectionService = mock(AuthProtectionService.class);
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login").build());
 
-        String passwordDigest = PasswordDigestProtocol.sha1Utf8("platform-password");
-        String passwordHash = passwordEncoder.encode(passwordDigest);
+        String password = PasswordProtocol.sha1Utf8("platform-password");
+        String passwordHash = passwordEncoder.encode(password);
         when(jwtService.generateAccessToken(eq("platform-super-admin"), any())).thenReturn("access-token");
         when(jwtService.generateRefreshToken(eq("platform-super-admin"), any())).thenReturn("refresh-token");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -58,7 +58,7 @@ class AuthServiceImplTest {
                 authProtectionService
         );
 
-        var response = authService.login(new LoginRequest("platform-admin", passwordDigest, null, null), exchange).block();
+        var response = authService.login(new LoginRequest("platform-admin", password, null, null), exchange).block();
 
         ArgumentCaptor<Map<String, Object>> claimsCaptor = ArgumentCaptor.forClass(Map.class);
         org.mockito.Mockito.verify(jwtService).generateAccessToken(eq("platform-super-admin"), claimsCaptor.capture());

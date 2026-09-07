@@ -55,7 +55,7 @@ public class RegisterController extends BaseController<RegisterPageDTO, Register
      * </p>
      */
     @Operation(summary = "用户注册申请",
-            description = "提交注册申请。passwordDigest 必须为UTF-8原始密码的SHA-1小写十六进制摘要；系统将自动匹配员工档案并生成账号名。无需登录。")
+            description = "提交注册申请。password 必须为UTF-8原始密码的SHA-1小写十六进制摘要；系统将自动匹配员工档案并生成账号名。无需登录。")
     @PostMapping("/")
     public ApiResponse<RegisterResultVO> register(@Valid @RequestBody RegisterCreateDTO dto) {
         return ApiResponse.ok(service.register(dto));
