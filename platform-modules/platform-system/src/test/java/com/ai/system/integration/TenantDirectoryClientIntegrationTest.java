@@ -157,7 +157,7 @@ class TenantDirectoryClientIntegrationTest {
     private static TenantDirectoryProperties bindProperties(Map<String, String> values) {
         return new Binder(new MapConfigurationPropertySource(values))
                 .bind("platform.directory", Bindable.of(TenantDirectoryProperties.class))
-                .orElseThrow();
+                .orElseThrow(() -> new IllegalStateException("目录测试配置未绑定"));
     }
 
     private static LoadBalancedExchangeFilterFunction passthroughLoadBalancer() {
