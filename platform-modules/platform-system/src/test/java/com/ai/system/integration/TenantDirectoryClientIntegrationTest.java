@@ -27,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -161,10 +163,10 @@ class TenantDirectoryClientIntegrationTest {
     }
 
     private static LoadBalancedExchangeFilterFunction passthroughLoadBalancer() {
-        LoadBalancedExchangeFilterFunction loadBalancer = mock(LoadBalancedExchangeFilterFunction.class);
-        when(loadBalancer.filter(any(ClientRequest.class), any(ExchangeFunction.class)))
-                .thenAnswer(invocation -> invocation.<ExchangeFunction>getArgument(1)
-                        .exchange(invocation.getArgument(0)));
+        LoadBalancedExchangeFilterFunction loadBalancer = mock(LoadBalancedExchangeFilterFunction.class, CALLS_REAL_METHODS);
+        doAnswer(invocation -> invocation.<ExchangeFunction>getArgument(1)
+                .exchange(invocation.getArgument(0)))
+                .when(loadBalancer).filter(any(ClientRequest.class), any(ExchangeFunction.class));
         return loadBalancer;
     }
 
