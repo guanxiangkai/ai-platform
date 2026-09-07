@@ -98,6 +98,19 @@ class RegistrationOutboxProcessorTest {
     }
 
     @Test
+    void processShouldUseAControlledRetryReasonWhenDirectoryThrowsPrivateDetails() {
+        RegistrationOutbox event = event();
+        Register record = record();
+        when(transactions.claim(event.getId())).thenReturn(record);
+        when(directoryClient.currentAssignment(record.getDirectorySubjectId()))
+                .thenReturn(Mono.error(new IllegalStateException("private directory identity: subject-1")));
+
+        processor.process(event);
+
+        verify(transactions).retry(event.getId(), "目录服务调用失败");
+    }
+
+    @Test
     void processReadyShouldIsolateTenantFailuresAndRestoreTheScope() {
         when(tenantCatalog.findReadyTenantIds(any(LocalDateTime.class)))
                 .thenReturn(List.of("tenant-a", "tenant-b"));

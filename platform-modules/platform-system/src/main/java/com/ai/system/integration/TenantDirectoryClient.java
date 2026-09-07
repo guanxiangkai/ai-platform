@@ -13,6 +13,10 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
 /**
  * 按租户路由到外部目录适配器。
  *
@@ -31,6 +35,12 @@ public class TenantDirectoryClient {
 
     /**
      * 在当前租户的目录中匹配注册主体。
+     *
+     * @param displayName 注册人显示名称
+     * @param groupId 平台部门 ID；由当前租户的目录适配器转换为其外部目录分组
+     * @param phone 注册手机号
+     * @param email 注册邮箱
+     * @return 当前租户目录返回的匹配结果
      */
     public Mono<DirectoryMatchResult> matchForRegistration(
             String displayName,
@@ -38,39 +48,58 @@ public class TenantDirectoryClient {
             String phone,
             String email
     ) {
+        Map<String, String> uriVariables = new HashMap<>();
+        Optional<String> phoneValue = optionalText(phone);
+        Optional<String> emailValue = optionalText(email);
         return client().get()
-                .uri(uriBuilder -> uriBuilder.path("/internal/directory/matchForRegistration")
-                        .queryParam("displayName", displayName)
-                        .queryParam("groupId", groupId)
-                        .queryParamIfPresent("phone", optionalText(phone))
-                        .queryParamIfPresent("email", optionalText(email))
-                        .build())
+                .uri(uriBuilder -> {
+                    Optional<String> displayNameTemplate = queryTemplate(uriVariables, "displayName", displayName);
+                    Optional<String> groupIdTemplate = queryTemplate(uriVariables, "groupId", groupId);
+                    Optional<String> phoneTemplate = phoneValue.flatMap(value -> queryTemplate(uriVariables, "phone", value));
+                    Optional<String> emailTemplate = emailValue.flatMap(value -> queryTemplate(uriVariables, "email", value));
+                    return uriBuilder.path("/internal/directory/matchForRegistration")
+                            .queryParamIfPresent("displayName", displayNameTemplate)
+                            .queryParamIfPresent("groupId", groupIdTemplate)
+                            .queryParamIfPresent("phone", phoneTemplate)
+                            .queryParamIfPresent("email", emailTemplate)
+                            .build(uriVariables);
+                })
                 .retrieve()
-                .bodyToMono(DirectoryMatchResult.class);
+                .bodyToMono(DirectoryMatchResult.class)
+                .timeout(properties.requestTimeout());
     }
 
     /**
      * 将平台账户绑定到当前租户的目录主体。
      */
     public Mono<Boolean> linkUser(String subjectId, String userId) {
+        DirectoryMatchResult.requireIdentityId(subjectId, "目录主体 ID");
+        DirectoryMatchResult.requireIdentityId(userId, "平台用户 ID");
+        Map<String, String> uriVariables = Map.of("subjectId", subjectId, "userId", userId);
         return client().post()
                 .uri(uriBuilder -> uriBuilder.path("/internal/directory/linkUser")
-                        .queryParam("subjectId", subjectId)
-                        .queryParam("userId", userId)
-                        .build())
+                        .queryParam("subjectId", "{subjectId}")
+                        .queryParam("userId", "{userId}")
+                        .build(uriVariables))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .retrieve()
-                .bodyToMono(Boolean.class);
+                .bodyToMono(Boolean.class)
+                .timeout(properties.requestTimeout());
     }
 
     /**
      * 查询当前目录主体的有效分配信息。
      */
     public Mono<DirectoryAssignment> currentAssignment(String subjectId) {
+        DirectoryMatchResult.requireIdentityId(subjectId, "目录主体 ID");
         return client().get()
-                .uri("/internal/directory/{subjectId}/currentAssignment", subjectId)
+                .uri(uriBuilder -> uriBuilder.path("/internal/directory")
+                        .pathSegment("{subjectId}")
+                        .path("/currentAssignment")
+                        .build(subjectId))
                 .retrieve()
-                .bodyToMono(DirectoryAssignment.class);
+                .bodyToMono(DirectoryAssignment.class)
+                .timeout(properties.requestTimeout());
     }
 
     private WebClient client() {
@@ -90,7 +119,15 @@ public class TenantDirectoryClient {
                 .build();
     }
 
-    private java.util.Optional<String> optionalText(String value) {
+    private Optional<String> optionalText(String value) {
         return StringUtils.hasText(value) ? java.util.Optional.of(value.trim()) : java.util.Optional.empty();
+    }
+
+    private Optional<String> queryTemplate(Map<String, String> uriVariables, String name, String value) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        uriVariables.put(name, value);
+        return Optional.of("{" + name + "}");
     }
 }

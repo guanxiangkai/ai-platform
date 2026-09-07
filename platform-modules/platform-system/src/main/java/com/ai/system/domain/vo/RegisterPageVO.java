@@ -45,10 +45,10 @@ public class RegisterPageVO extends DataPageVO {
     @Schema(description = "性别")
     private String gender;
 
-    @Schema(description = "注册部门ID")
+    @Schema(description = "平台部门ID")
     private String deptId;
 
-    @Schema(description = "匹配的外部目录主体ID")
+    @Schema(description = "租户外部档案目录主体ID")
     private String directorySubjectId;
 
     @Schema(description = "注册开通状态")
@@ -64,7 +64,7 @@ public class RegisterPageVO extends DataPageVO {
     @Schema(description = "审核人ID")
     private String auditBy;
 
-    @Schema(description = "关联用户ID(审核通过后生成)")
+    @Schema(description = "本地系统账户ID(审核通过后生成)")
     private String userId;
 
     @Schema(description = "创建时间")

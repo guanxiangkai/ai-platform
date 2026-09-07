@@ -31,6 +31,7 @@ class RegistrationOutboxContractTest {
         assertThat(processor).contains("directoryClient.currentAssignment", "directoryClient.linkUser");
         assertThat(processor).doesNotContain("@Transactional");
         assertThat(transactionService).doesNotContain("directoryClient.");
+        assertThat(processor).doesNotContain("exception.getMessage()");
     }
 
     private Path projectRoot() {

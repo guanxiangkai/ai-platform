@@ -19,6 +19,8 @@ dependencies {
     implementation(libs.pinyin4j)
     annotationProcessor(libs.spring.boot.configuration.processor)
     runtimeOnly(libs.postgresql)
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
 
     // ===== 跨服务 API 契约（HTTP Interface 客户端）=====
     implementation(project(":platform-api:platform-core-api"))
