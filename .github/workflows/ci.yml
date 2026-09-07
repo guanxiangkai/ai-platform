@@ -103,3 +103,48 @@ jobs:
             platform-modules/platform-scheduler/build/libs/platform-scheduler-1.0.0-SNAPSHOT.jar
           if-no-files-found: error
           retention-days: 7
+
+      - name: 记录平台服务制品摘要
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          names = ['platform-auth', 'platform-gateway', 'platform-system', 'platform-files', 'platform-sse', 'platform-agent', 'platform-scheduler']
+          jars = {}
+          for name in names:
+              directory = pathlib.Path(name) if name in ['platform-auth', 'platform-gateway'] else pathlib.Path('platform-modules') / name
+              with (directory / 'build/libs' / (name + '-1.0.0-SNAPSHOT.jar')).open('rb') as source:
+                  jars[name] = hashlib.file_digest(source, 'sha256').hexdigest()
+          pathlib.Path('build/platform-service-manifest.json').write_text(json.dumps({'revision': os.environ['GITHUB_SHA'], 'jars': jars}, indent=2))
+          PY
+
+      - name: 上传平台服务制品摘要
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-service-manifest-${{ github.sha }}
+          path: build/platform-service-manifest.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 生成不可变平台 API Maven bundle
+        run: >-
+          ./gradlew
+          :platform-api:platform-core-api:publishMavenJavaPublicationToApiBundleRepository
+          :platform-api:platform-system-api:publishMavenJavaPublicationToApiBundleRepository
+          :platform-api:platform-files-api:publishMavenJavaPublicationToApiBundleRepository
+          :platform-api:platform-agent-api:publishMavenJavaPublicationToApiBundleRepository
+          -Pversion=1.0.0-${GITHUB_SHA}
+          --no-daemon --stacktrace
+
+      - name: 校验平台 API Maven bundle
+        run: >-
+          sh scripts/verify-platform-api-maven-bundle.sh
+          build/platform-api-maven-repository
+          1.0.0-${GITHUB_SHA}
+
+      - name: 上传平台 API Maven bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-api-maven-${{ github.sha }}
+          path: build/platform-api-maven-repository
+          if-no-files-found: error
+          retention-days: 7
