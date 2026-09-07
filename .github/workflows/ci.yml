@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: guanxiangkai/ai-plus
-          ref: ba230338f33ba45f0965716051870a09b26b0856
+          ref: 965f6f6093276a5c3259a385f2c63d6a544f8c3c
           path: .ci/ai-plus
 
       - name: 配置 JDK 25
@@ -81,6 +81,49 @@ jobs:
       - name: 直接使用发布制品构建和测试全部模块
         run: ./gradlew buildAll --no-daemon --stacktrace
 
+      - name: 校验网关部署包的日志切面运行时依赖
+        run: python3 scripts/verify-gateway-runtime.py platform-gateway/build/libs/platform-gateway-1.0.0-SNAPSHOT.jar
+
+      - name: 上传 platform-auth 可部署制品
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-auth-${{ github.sha }}
+          path: platform-auth/build/libs/platform-auth-1.0.0-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 上传 platform-gateway 可部署制品
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-gateway-${{ github.sha }}
+          path: platform-gateway/build/libs/platform-gateway-1.0.0-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 上传 platform-system 可部署制品
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-system-${{ github.sha }}
+          path: platform-modules/platform-system/build/libs/platform-system-1.0.0-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 上传 platform-files 可部署制品
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-files-${{ github.sha }}
+          path: platform-modules/platform-files/build/libs/platform-files-1.0.0-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 上传 platform-sse 可部署制品
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-sse-${{ github.sha }}
+          path: platform-modules/platform-sse/build/libs/platform-sse-1.0.0-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 7
+
       - name: 上传 platform-agent 可部署制品
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -89,18 +132,11 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: 上传全部平台服务部署包
+      - name: 上传 platform-scheduler 可部署制品
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: platform-services-${{ github.sha }}
-          path: |
-            platform-auth/build/libs/platform-auth-1.0.0-SNAPSHOT.jar
-            platform-gateway/build/libs/platform-gateway-1.0.0-SNAPSHOT.jar
-            platform-modules/platform-system/build/libs/platform-system-1.0.0-SNAPSHOT.jar
-            platform-modules/platform-files/build/libs/platform-files-1.0.0-SNAPSHOT.jar
-            platform-modules/platform-sse/build/libs/platform-sse-1.0.0-SNAPSHOT.jar
-            platform-modules/platform-agent/build/libs/platform-agent-1.0.0-SNAPSHOT.jar
-            platform-modules/platform-scheduler/build/libs/platform-scheduler-1.0.0-SNAPSHOT.jar
+          name: platform-scheduler-${{ github.sha }}
+          path: platform-modules/platform-scheduler/build/libs/platform-scheduler-1.0.0-SNAPSHOT.jar
           if-no-files-found: error
           retention-days: 7
 
