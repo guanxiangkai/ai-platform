@@ -1,5 +1,6 @@
 dependencies {
     implementation(libs.bundles.platform.service)
+    implementation(libs.web.plus.web)
     runtimeOnly(libs.postgresql)
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
