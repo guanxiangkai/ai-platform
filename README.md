@@ -135,6 +135,24 @@ Linux CI 以两条独立路径验证依赖：源码联调检出工作流固定�
 发布依赖校验直接从 Maven Central 解析制品。两条路径都执行全部平台模块的构建与测试，
 可部署制品仅由发布依赖校验产出，避免源码替换掩盖缺失或不完整的发布依赖。
 
+发布依赖校验通过后，CI 还会生成 `platform-api-maven-<commit>` 制品。该制品是完整的
+Maven 目录，只包含 `platform-core-api`、`platform-system-api`、`platform-files-api` 和
+`platform-agent-api` 的 JAR 与 POM；不会上传 Maven Central、GitHub Packages 或其他远程仓库。
+每次 CI 用完整提交哈希生成 `1.0.0-<commit>` 坐标，消费方必须下载对应制品并将其真实目录
+作为 Maven repository，同时使用相同版本，例如：
+
+```kotlin
+repositories {
+    maven { url = uri(platformApiRepositoryDirectory) }
+}
+dependencies {
+    implementation("com.ai.platform:platform-system-api:1.0.0-<commit>")
+}
+```
+
+框架 API 以二进制 Maven 制品提供，消费方不依赖、也不得同步平台源码；公共 AI Plus 依赖继续
+从其已发布 Maven 制品解析。
+
 源码联调：
 
 ```bash
