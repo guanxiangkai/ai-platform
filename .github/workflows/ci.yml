@@ -89,12 +89,17 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: 上传认证与系统服务可部署制品
+      - name: 上传全部平台服务部署包
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: platform-password-services-${{ github.sha }}
+          name: platform-services-${{ github.sha }}
           path: |
             platform-auth/build/libs/platform-auth-1.0.0-SNAPSHOT.jar
+            platform-gateway/build/libs/platform-gateway-1.0.0-SNAPSHOT.jar
             platform-modules/platform-system/build/libs/platform-system-1.0.0-SNAPSHOT.jar
+            platform-modules/platform-files/build/libs/platform-files-1.0.0-SNAPSHOT.jar
+            platform-modules/platform-sse/build/libs/platform-sse-1.0.0-SNAPSHOT.jar
+            platform-modules/platform-agent/build/libs/platform-agent-1.0.0-SNAPSHOT.jar
+            platform-modules/platform-scheduler/build/libs/platform-scheduler-1.0.0-SNAPSHOT.jar
           if-no-files-found: error
           retention-days: 7
