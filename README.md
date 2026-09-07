@@ -135,6 +135,10 @@ Linux CI 以两条独立路径验证依赖：源码联调检出工作流固定�
 发布依赖校验直接从 Maven Central 解析制品。两条路径都执行全部平台模块的构建与测试，
 可部署制品仅由发布依赖校验产出，避免源码替换掩盖缺失或不完整的发布依赖。
 
+可部署服务按模块上传为 `<service>-<commit>` 制品，每个文件仅包含该服务的可执行 JAR，
+并统一提供 `platform-service-manifest-<commit>` SHA-256 清单，便于按服务下载和独立核验。
+CI 使用网关实际部署包中的依赖反射加载日志切面，检查发布依赖能满足运行时类加载。
+
 发布依赖校验通过后，CI 还会生成 `platform-api-maven-<commit>` 制品。该制品是完整的
 Maven 目录，只包含 `platform-core-api`、`platform-system-api`、`platform-files-api` 和
 `platform-agent-api` 的 JAR 与 POM；不会上传 Maven Central、GitHub Packages 或其他远程仓库。
