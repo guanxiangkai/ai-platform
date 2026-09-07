@@ -14,15 +14,21 @@ import java.io.Serial;
 import java.time.LocalDateTime;
 
 /**
- * 用户注册记录实体
+ * 用户注册记录实体。
  * <p>
  * 用户自助注册后生成注册记录：
  * <ul>
- *   <li>注册时：系统根据真实姓名拼音首字母自动生成用户名，并从租户目录匹配主体。</li>
- *   <li>匹配失败（未找到主体或主体已有账户）则注册被拒绝。</li>
+ *   <li>注册时：系统根据真实姓名拼音首字母自动生成用户名，并从租户目录匹配目录主体。</li>
+ *   <li>匹配失败（未找到目录主体或目录主体已有账户）则注册被拒绝。</li>
  *   <li>审核通过时：仅创建用户账户，并回写 userId，同时通知目录服务绑定账户。</li>
  * </ul>
  * </p>
+ *
+ * <p>目录主体 ID 是租户外部档案 ID，用户 ID 是本地系统账户 ID，部门 ID 是平台部门 ID。
+ * 它们只保存各自服务的标识，不建立跨服务 JPA 关联或外键。有效注册申请的目录主体唯一性
+ * 由私有 DDL 创建的 PostgreSQL 部分唯一索引 {@code uk_sys_register_directory_subject_active}
+ * （{@code tenant_id, directory_subject_id}，{@code deleted = false and registration_state <> 'REJECTED'}）保证；
+ * 不使用 JPA {@code @Index} 表达该条件索引。</p>
  *
  * @author guanxiangkai
  * @since 1.0.0
@@ -71,9 +77,9 @@ public class Register extends SortableTenantEntity {
     private String deptId;
 
     /**
-     * 注册时匹配到的外部目录主体 ID。
+     * 注册时匹配到的租户外部档案目录主体 ID。
      */
-    @Column(name = "directory_subject_id", nullable = false, length = 64, comment = "外部目录主体ID")
+    @Column(name = "directory_subject_id", nullable = false, length = 64, comment = "租户外部档案目录主体ID")
     private String directorySubjectId;
 
     /** 注册开通状态；仅 ACTIVE 的账户可登录。 */

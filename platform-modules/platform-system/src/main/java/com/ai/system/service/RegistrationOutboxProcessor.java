@@ -30,6 +30,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class RegistrationOutboxProcessor {
+    private static final String DIRECTORY_PROCESSING_FAILED = "目录服务调用失败";
     private final RegistrationOutboxRepository outboxRepository;
     private final RoleRepository roleRepository;
     private final TenantDirectoryClient directoryClient;
@@ -50,7 +51,7 @@ public class RegistrationOutboxProcessor {
                     List.of(OutboxDeliveryState.PENDING, OutboxDeliveryState.RETRY, OutboxDeliveryState.PROCESSING),
                     now, PageRequest.of(0, properties.getBatchSize())).forEach(this::process));
         } catch (Exception exception) {
-            log.error("注册开通任务按租户调度失败: tenantId={}", tenantId, exception);
+            log.error("注册开通任务按租户调度失败: category={}", exception.getClass().getSimpleName());
         }
     }
 
@@ -70,7 +71,9 @@ public class RegistrationOutboxProcessor {
             }
             transactions.activate(event.getId(), role.getId());
         } catch (Exception exception) {
-            transactions.retry(event.getId(), exception.getMessage());
+            log.warn("注册开通远端调用失败: eventId={}, category={}",
+                    event.getId(), exception.getClass().getSimpleName());
+            transactions.retry(event.getId(), DIRECTORY_PROCESSING_FAILED);
         }
     }
 

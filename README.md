@@ -77,6 +77,28 @@ Web Plus 接口载荷加密采用显式选择契约：未标注 `@ApiCrypto` 的
 改密和重置接口使用 `oldPassword`、`newPassword`；输入校验与 BCrypt 编码复用
 Web Plus Security 的 `PasswordProtocol` 和 `ProtocolPasswordEncoder`，平台只负责显式装配和业务编排。
 
+目录匹配注册按租户通过 `platform.directory.tenants` 显式接入外部目录服务，
+每个租户配置 `service-name` 和 `registration-enabled`。未配置适配器时不开放该租户的目录注册；
+`platform.directory.request-timeout` 控制单次调用超时，默认 5 秒。
+
+| 注册关联 | 数据所有者与约束 |
+| --- | --- |
+| `tenant_id` + `directory_subject_id` | 标识当前租户目录中的主体；由外部目录管理，平台保持 ID 原值，不建立跨服务数据库外键 |
+| `dept_id` | 平台部门 ID；匹配时作为 `groupId` 传给适配器，由适配器转换为业务侧的分组 |
+| `user_id` | 审核通过后创建的平台账号；目录绑定及角色分配完成后才启用 |
+| `assignmentId` / `groupId` 返回值 | 外部目录的分配项和分组 ID，不直接写入平台岗位、部门或角色主键 |
+
+适配器提供 `/internal/directory/matchForRegistration`、`/internal/directory/linkUser`
+和 `/internal/directory/{subjectId}/currentAssignment`。账号绑定必须幂等：
+重复绑定同一主体与账号返回成功，绑定到其他账号必须拒绝；适配器始终按可信租户上下文访问业务数据。
+目录岗位和分组名称用于匹配平台中已启用的角色，未匹配时采用显式标记的默认注册角色。
+平台角色及权限的权威仍在系统服务中，外部目录不返回或指定平台角色主键。
+
+部署数据库必须以部分唯一索引保证关联完整性：`uk_sys_register_directory_subject_active`
+约束同一租户下未删除且未拒绝的主体申请唯一；`uk_sys_register_user_active` 约束同一租户下
+未删除申请关联的非空账号唯一。审核拒绝后允许重新申请，逻辑删除记录不占用主体申请名额。
+相关数据库结构由部署方维护，发布前同时核对列、索引和约束，Hibernate 的列校验不能替代索引验收。
+
 `POST /agent/session/ask/stream` 返回 `start`、`delta`、`replace`、`complete` 或 `error` 事件。
 Dify 适配器处理真实增量与全文替换；OpenAI-compatible 适配器当前返回单个完成结果，
 不提供逐 token 输出。上游结果先持久化为可恢复状态，再完成消息和会话写入；重复幂等调用
