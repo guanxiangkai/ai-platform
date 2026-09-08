@@ -42,6 +42,7 @@ class SsePushRecordVisibilityTest {
         SsePushRecord visible = record("user-1");
         SsePushRecord restricted = record(PlatformSuperAdmin.USER_ID);
         SsePushRecordVO expected = new SsePushRecordVO();
+        when(repository.entityClass()).thenReturn(SsePushRecord.class);
         when(repository.findById("record-1")).thenReturn(Optional.of(visible), Optional.of(restricted));
         when(repository.detailVoClass()).thenReturn(SsePushRecordVO.class);
 
@@ -60,6 +61,7 @@ class SsePushRecordVisibilityTest {
         SsePushRecordServiceImpl service = new SsePushRecordServiceImpl(repository, mock(SseProperties.class));
         SsePushRecord restricted = record("user-2");
         restricted.setUserIds("user-2," + PlatformSuperAdmin.USER_ID);
+        when(repository.entityClass()).thenReturn(SsePushRecord.class);
         when(repository.findById("record-1")).thenReturn(Optional.of(restricted));
 
         assertThatThrownBy(() -> service.detail("record-1"))
