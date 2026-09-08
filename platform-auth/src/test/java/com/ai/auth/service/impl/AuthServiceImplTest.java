@@ -6,7 +6,6 @@ import com.ai.auth.properties.AuthSuperAdminProperties;
 import com.ai.auth.properties.JwtProperties;
 import com.ai.auth.service.AuthProtectionService;
 import io.github.guanxiangkai.web.plus.security.password.PasswordProtocol;
-import io.github.guanxiangkai.web.plus.security.password.ProtocolPasswordEncoder;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,8 +30,8 @@ class AuthServiceImplTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void loginShouldUseConfiguredSuperAdminHashFromAuthConfigOnly() {
-        PasswordEncoder passwordEncoder = new ProtocolPasswordEncoder();
+    void loginShouldUseConfiguredSuperAdminDigestFromAuthConfigOnly() {
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         RsaJwtServiceImpl jwtService = mock(RsaJwtServiceImpl.class);
         JwtProperties jwtProperties = mock(JwtProperties.class);
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
@@ -41,7 +40,6 @@ class AuthServiceImplTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login").build());
 
         String password = PasswordProtocol.sha1Utf8("platform-password");
-        String passwordHash = passwordEncoder.encode(password);
         when(jwtService.generateAccessToken(eq("platform-super-admin"), any())).thenReturn("access-token");
         when(jwtService.generateRefreshToken(eq("platform-super-admin"), any())).thenReturn("refresh-token");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -53,7 +51,7 @@ class AuthServiceImplTest {
                 passwordEncoder,
                 jwtService,
                 jwtProperties,
-                new AuthSuperAdminProperties(true, "platform-admin", passwordHash),
+                new AuthSuperAdminProperties(true, "platform-admin", password),
                 redisTemplate,
                 authProtectionService
         );
@@ -77,7 +75,7 @@ class AuthServiceImplTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void loginShouldVerifyConfiguredSuperAdminOnlyThroughPasswordEncoder() {
+    void loginShouldVerifyConfiguredSuperAdminWithoutPasswordEncoder() {
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         RsaJwtServiceImpl jwtService = mock(RsaJwtServiceImpl.class);
         JwtProperties jwtProperties = mock(JwtProperties.class);
@@ -93,24 +91,24 @@ class AuthServiceImplTest {
         when(jwtProperties.getAccessTokenExpirationSeconds()).thenReturn(7200L);
         when(jwtProperties.getRefreshTokenExpirationSeconds()).thenReturn(86400L);
 
-        String bcryptHash = validBcryptHash();
-        when(passwordEncoder.matches(digest(), bcryptHash)).thenReturn(true);
+        String configuredDigest = digest();
         AuthServiceImpl authService = new AuthServiceImpl(
                 passwordEncoder,
                 jwtService,
                 jwtProperties,
-                new AuthSuperAdminProperties(true, "admin", bcryptHash),
+                new AuthSuperAdminProperties(true, "admin", configuredDigest),
                 redisTemplate,
                 authProtectionService
         );
 
-        var response = authService.login(new LoginRequest("admin", digest(), null, null), exchange).block();
+        var response = authService.login(new LoginRequest("admin", configuredDigest, null, null), exchange).block();
 
         ArgumentCaptor<Map<String, Object>> claimsCaptor = ArgumentCaptor.forClass(Map.class);
         org.mockito.Mockito.verify(jwtService).generateAccessToken(eq("platform-super-admin"), claimsCaptor.capture());
         assertThat(claimsCaptor.getValue()).containsEntry("superAdmin", true);
         assertThat(response).isNotNull();
         assertThat(response.superAdmin()).isTrue();
+        org.mockito.Mockito.verifyNoInteractions(passwordEncoder);
     }
 
     @Test
@@ -166,7 +164,7 @@ class AuthServiceImplTest {
                 passwordEncoder,
                 jwtService,
                 jwtProperties,
-                new AuthSuperAdminProperties(true, "admin", validBcryptHash()),
+                new AuthSuperAdminProperties(true, "admin", digest()),
                 redisTemplate,
                 authProtectionService
         );
@@ -190,28 +188,49 @@ class AuthServiceImplTest {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         AuthProtectionService authProtectionService = mock(AuthProtectionService.class);
         MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login").build());
-        String passwordHash = validBcryptHash();
-        when(passwordEncoder.matches(digest(), passwordHash)).thenReturn(false);
+        String passwordDigest = digest();
 
         AuthServiceImpl authService = new AuthServiceImpl(
                 passwordEncoder,
                 jwtService,
                 jwtProperties,
-                new AuthSuperAdminProperties(true, "platform-admin", passwordHash),
+                new AuthSuperAdminProperties(true, "platform-admin", passwordDigest),
                 redisTemplate,
                 authProtectionService
         );
 
         assertThatThrownBy(() -> authService.login(
-                new LoginRequest("platform-admin", digest(), null, null), exchange).block())
+                new LoginRequest("platform-admin", "b".repeat(40), null, null), exchange).block())
                 .hasMessageContaining("用户名或密码错误");
+        org.mockito.Mockito.verifyNoInteractions(passwordEncoder);
     }
 
-    private static String validBcryptHash() {
-        return "$2b$12$" + "A".repeat(53);
+    @Test
+    void loginShouldRejectEmptyUppercaseAndBcryptSuperAdminCredentials() {
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        AuthServiceImpl authService = new AuthServiceImpl(
+                passwordEncoder,
+                mock(RsaJwtServiceImpl.class),
+                mock(JwtProperties.class),
+                new AuthSuperAdminProperties(true, "platform-admin", digest()),
+                mock(StringRedisTemplate.class),
+                mock(AuthProtectionService.class)
+        );
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login").build());
+
+        for (String credential : new String[]{"", "A".repeat(40), "$2b$12$" + "A".repeat(53)}) {
+            assertThatThrownBy(() -> authService.login(
+                    new LoginRequest("platform-admin", credential, null, null), exchange).block())
+                    .hasMessageContaining("用户名或密码错误");
+        }
+        org.mockito.Mockito.verifyNoInteractions(passwordEncoder);
     }
 
     private static String digest() {
         return "a".repeat(40);
+    }
+
+    private static String validBcryptHash() {
+        return "$2b$12$" + "A".repeat(53);
     }
 }

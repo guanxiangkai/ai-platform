@@ -53,7 +53,9 @@ public class SsePushRecordServiceImpl
 
     @Override
     protected Specification<SsePushRecord> buildQuerySpec(SsePushRecordPageDTO pageDTO) {
-        if (pageDTO == null) return (root, query, cb) -> cb.conjunction();
+        if (pageDTO == null) {
+            return SuperAdminSseVisibility.pushSpecification();
+        }
         return SpecUtils.<SsePushRecord>builder()
                 .eqIfPresent(SsePushRecord::getMessageId, pageDTO.getMessageId())
                 .eqIfPresent(SsePushRecord::getTargetType, pageDTO.getTargetType())
@@ -62,7 +64,16 @@ public class SsePushRecordServiceImpl
                 .eqIfPresent(SsePushRecord::getPushStatus, pageDTO.getPushStatus())
                 .geTimeIfPresent(SsePushRecord::getPushTime, pageDTO.getStartTime())
                 .leTimeIfPresent(SsePushRecord::getPushTime, pageDTO.getEndTime())
-                .build();
+                .build()
+                .and(SuperAdminSseVisibility.pushSpecification());
+    }
+
+    @Override
+    protected SsePushRecord requireEntity(String id) {
+        SsePushRecord entity = super.requireEntity(id);
+        SuperAdminSseVisibility.requireVisible(entity.getUserId(), entity.getUserIds(),
+                entity.getCreateBy(), entity.getUpdateBy(), getEntityName(), id);
+        return entity;
     }
 
     @Override
@@ -76,7 +87,8 @@ public class SsePushRecordServiceImpl
     public int cleanupHistory(int retainDays) {
         LocalDateTime cutoff = LocalDate.now().minusDays(retainDays).atStartOfDay();
         Page<SsePushRecord> page = repository.findAll(
-                (root, query, cb) -> cb.lessThan(root.get("pushTime"), cutoff),
+                SuperAdminSseVisibility.<SsePushRecord>pushSpecification()
+                        .and((root, query, cb) -> cb.lessThan(root.get("pushTime"), cutoff)),
                 PageRequest.of(0, properties.historyCleanupBatchSize()));
         List<SsePushRecord> oldRecords = page.getContent();
         if (!oldRecords.isEmpty()) {
@@ -85,4 +97,5 @@ public class SsePushRecordServiceImpl
         }
         return oldRecords.size();
     }
+
 }

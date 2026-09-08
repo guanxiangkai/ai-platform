@@ -47,7 +47,7 @@ public class SsePushRecordVO implements Serializable {
     @Schema(description = "目标用户ID")
     private String userId;
 
-    @Schema(description = "目标用户ID列表(JSON)")
+    @Schema(description = "目标用户ID列表（逗号分隔）")
     private String userIds;
 
     @Schema(description = "消息标题")

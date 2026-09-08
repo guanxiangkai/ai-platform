@@ -64,9 +64,9 @@ public class SsePushRecord extends TenantEntity {
     private String userId;
 
     /**
-     * 目标用户 ID 列表（多用户推送，JSON 数组）
+     * 目标用户 ID 列表（多用户推送，逗号分隔）
      */
-    @Column(name = "user_ids", length = 2000, comment = "目标用户ID列表JSON")
+    @Column(name = "user_ids", length = 2000, comment = "目标用户ID列表（逗号分隔）")
     private String userIds;
 
     /** 消息标题 */

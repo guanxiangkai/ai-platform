@@ -14,6 +14,7 @@ import com.ai.auth.service.IAuthService;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import io.github.guanxiangkai.web.plus.core.exception.BaseException;
 import io.github.guanxiangkai.web.plus.log.annotation.LoginLog;
+import io.github.guanxiangkai.web.plus.security.password.PasswordProtocol;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,6 +28,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Map;
 import java.util.Set;
 
@@ -322,7 +325,7 @@ public class AuthServiceImpl implements IAuthService {
         return new AuthUserSnapshot(
                 PlatformSuperAdmin.USER_ID,
                 superAdminProperties.username().trim(),
-                superAdminProperties.passwordHash(),
+                superAdminProperties.passwordDigest(),
                 true,
                 tokenVersion,
                 "超级管理员",
@@ -339,12 +342,16 @@ public class AuthServiceImpl implements IAuthService {
     }
 
     private boolean matchesConfiguredSuperAdminPassword(String rawPassword) {
-        String configuredPasswordHash = superAdminProperties.passwordHash();
-        if (!StringUtils.hasText(rawPassword) || !StringUtils.hasText(configuredPasswordHash)) {
+        // 超级管理员配置的就是前端摘要；先复用协议校验，再做等长常量时间比较，避免进入 BCrypt。
+        String configuredPasswordDigest = superAdminProperties.passwordDigest();
+        if (!StringUtils.hasText(configuredPasswordDigest)) {
             return false;
         }
         try {
-            return passwordEncoder.matches(rawPassword, configuredPasswordHash.trim());
+            String submittedPasswordDigest = PasswordProtocol.requirePassword(rawPassword);
+            return MessageDigest.isEqual(
+                    submittedPasswordDigest.getBytes(StandardCharsets.UTF_8),
+                    configuredPasswordDigest.getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException e) {
             return false;
         }
