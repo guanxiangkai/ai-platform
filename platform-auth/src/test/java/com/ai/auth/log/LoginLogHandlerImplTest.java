@@ -42,7 +42,7 @@ class LoginLogHandlerImplTest {
         AuthSuperAdminProperties properties = new AuthSuperAdminProperties(
                 true,
                 "root",
-                "$2b$12$" + "A".repeat(53)
+                "0123456789abcdef0123456789abcdef01234567"
         );
         LoginLogHandlerImpl handler = new LoginLogHandlerImpl(repository, properties);
         AuthLoginLogRecord record = new AuthLoginLogRecord();

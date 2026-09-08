@@ -49,7 +49,7 @@ public class SseLogServiceImpl
 
     @Override
     protected Specification<SseLog> buildQuerySpec(SseLogPageDTO pageDTO) {
-        if (pageDTO == null) return (root, query, cb) -> cb.conjunction();
+        if (pageDTO == null) return SuperAdminSseVisibility.userIdSpecification();
         return SpecUtils.<SseLog>builder()
                 .eqIfPresent(SseLog::getOperationType, pageDTO.getOperationType())
                 .eqIfPresent(SseLog::getMessageType, pageDTO.getMessageType())
@@ -58,7 +58,16 @@ public class SseLogServiceImpl
                 .eqIfPresent(SseLog::getStatus, pageDTO.getStatus())
                 .geTimeIfPresent(SseLog::getLogTime, pageDTO.getStartTime())
                 .leTimeIfPresent(SseLog::getLogTime, pageDTO.getEndTime())
-                .build();
+                .build()
+                .and(SuperAdminSseVisibility.userIdSpecification());
+    }
+
+    @Override
+    protected SseLog requireEntity(String id) {
+        SseLog entity = super.requireEntity(id);
+        SuperAdminSseVisibility.requireVisible(entity.getUserId(), entity.getCreateBy(), entity.getUpdateBy(),
+                getEntityName(), id);
+        return entity;
     }
 
     @Override

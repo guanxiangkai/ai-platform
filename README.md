@@ -77,6 +77,14 @@ Web Plus 接口载荷加密采用显式选择契约：未标注 `@ApiCrypto` 的
 改密和重置接口使用 `oldPassword`、`newPassword`；输入校验与 BCrypt 编码复用
 Web Plus Security 的 `PasswordProtocol` 和 `ProtocolPasswordEncoder`，平台只负责显式装配和业务编排。
 
+平台超级管理员是独立配置账号：前端提交一次 SHA-1 UTF-8 小写 40 位摘要，Auth 服务仅调用
+`PasswordProtocol.requirePassword` 校验输入，并以常量时间比较配置摘要，不调用 `PasswordEncoder`。
+在 Nacos 的 Auth 配置中通过 `ai.security.super-admin.enabled`、`username` 和
+`password-digest` 管理可变项；禁用时摘要可为空。部署模板为这三项保留同名
+`PLATFORM_SUPER_ADMIN_*` 环境变量注入入口。超级管理员固定使用代码常量
+`PlatformSuperAdmin.USER_ID=platform-super-admin`，不配入 Nacos，也不随用户名和密码变化。
+其他消费方共用 Auth 提供的登录能力，不直接读取超级管理员配置。
+
 目录匹配注册按租户通过 `platform.directory.tenants` 显式接入外部目录服务，
 每个租户配置 `service-name` 和 `registration-enabled`。未配置适配器时不开放该租户的目录注册；
 `platform.directory.request-timeout` 控制单次调用超时，默认 5 秒。

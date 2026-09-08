@@ -78,10 +78,10 @@ public class OperationLogServiceImpl
     }
 
     @Override
-    public OperationLogVO detail(String id) {
-        OperationLog entity = requireEntity(id);
+    protected OperationLog requireEntity(String id) {
+        OperationLog entity = super.requireEntity(id);
         SuperAdminLogVisibility.requireVisible(entity, getEntityName(), id);
-        return super.detail(id);
+        return entity;
     }
 
     @Override

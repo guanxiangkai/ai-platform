@@ -74,10 +74,10 @@ public class LoginLogServiceImpl
     }
 
     @Override
-    public LoginLogVO detail(String id) {
-        LoginLog entity = requireEntity(id);
+    protected LoginLog requireEntity(String id) {
+        LoginLog entity = super.requireEntity(id);
         SuperAdminLogVisibility.requireVisible(entity, getEntityName(), id);
-        return super.detail(id);
+        return entity;
     }
 
     @Override

@@ -69,8 +69,9 @@ public class SseConnectionRecordServiceImpl
 
     @Override
     protected Specification<SseConnectionRecord> buildQuerySpec(SseConnectionRecordPageDTO pageDTO) {
-        if (pageDTO == null) return (root, query, cb) -> cb.conjunction();
-        return SpecUtils.<SseConnectionRecord>builder()
+        Specification<SseConnectionRecord> filters = pageDTO == null
+                ? (root, query, cb) -> cb.conjunction()
+                : SpecUtils.<SseConnectionRecord>builder()
                 .eqIfPresent(SseConnectionRecord::getUserId, pageDTO.getUserId())
                 .eqIfPresent(SseConnectionRecord::getConnectionStatus, pageDTO.getConnectionStatus())
                 .eqIfPresent(SseConnectionRecord::getConnectionId, pageDTO.getConnectionId())
@@ -78,6 +79,15 @@ public class SseConnectionRecordServiceImpl
                 .geTimeIfPresent(SseConnectionRecord::getConnectTime, pageDTO.getStartTime())
                 .leTimeIfPresent(SseConnectionRecord::getConnectTime, pageDTO.getEndTime())
                 .build();
+        return filters.and(SuperAdminSseVisibility.userIdSpecification());
+    }
+
+    @Override
+    protected SseConnectionRecord requireEntity(String id) {
+        SseConnectionRecord entity = super.requireEntity(id);
+        SuperAdminSseVisibility.requireVisible(entity.getUserId(), entity.getCreateBy(), entity.getUpdateBy(),
+                getEntityName(), id);
+        return entity;
     }
 
     // ==================== 连接生命周期记录 ====================
@@ -129,15 +139,12 @@ public class SseConnectionRecordServiceImpl
     @Override
     public Map<String, Object> getConnectionStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("connected", repository
-                .countByConnectionStatusAndDeletedFalse(SseConstants.ConnectionStatus.CONNECTED));
-        stats.put("disconnected", repository
-                .countByConnectionStatusAndDeletedFalse(SseConstants.ConnectionStatus.DISCONNECTED));
-        stats.put("error", repository
-                .countByConnectionStatusAndDeletedFalse(SseConstants.ConnectionStatus.ERROR));
-        stats.put("timeout", repository
-                .countByConnectionStatusAndDeletedFalse(SseConstants.ConnectionStatus.TIMEOUT));
-        stats.put("total", repository.count());
+        Specification<SseConnectionRecord> visible = SuperAdminSseVisibility.userIdSpecification();
+        stats.put("connected", repository.count(visible.and(statusIs(SseConstants.ConnectionStatus.CONNECTED))));
+        stats.put("disconnected", repository.count(visible.and(statusIs(SseConstants.ConnectionStatus.DISCONNECTED))));
+        stats.put("error", repository.count(visible.and(statusIs(SseConstants.ConnectionStatus.ERROR))));
+        stats.put("timeout", repository.count(visible.and(statusIs(SseConstants.ConnectionStatus.TIMEOUT))));
+        stats.put("total", repository.count(visible));
         return stats;
     }
 
@@ -146,7 +153,8 @@ public class SseConnectionRecordServiceImpl
     public int cleanupHistory(int retainDays) {
         LocalDateTime cutoff = LocalDate.now().minusDays(retainDays).atStartOfDay();
         Page<SseConnectionRecord> page = repository.findAll(
-                (root, query, cb) -> cb.lessThan(root.get("connectTime"), cutoff),
+                SuperAdminSseVisibility.<SseConnectionRecord>userIdSpecification()
+                        .and((root, query, cb) -> cb.lessThan(root.get("connectTime"), cutoff)),
                 PageRequest.of(0, properties.historyCleanupBatchSize()));
         List<SseConnectionRecord> oldRecords = page.getContent();
         if (!oldRecords.isEmpty()) {
@@ -154,6 +162,10 @@ public class SseConnectionRecordServiceImpl
             log.info("[SSE-Audit] 清理历史连接记录: count={}, before={}", oldRecords.size(), cutoff);
         }
         return oldRecords.size();
+    }
+
+    private Specification<SseConnectionRecord> statusIs(String status) {
+        return (root, query, cb) -> cb.equal(root.get("connectionStatus"), status);
     }
 
     // ==================== 私有方法 ====================

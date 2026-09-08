@@ -15,24 +15,32 @@ class AuthSuperAdminPropertiesTest {
     }
 
     @Test
-    void enabledConfigurationRequiresUsernameAndHash() {
+    void enabledConfigurationRequiresUsernameAndDigest() {
         assertThatThrownBy(() -> new AuthSuperAdminProperties(true, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("独立账号和密码哈希");
+                .hasMessageContaining("独立账号和密码摘要");
     }
 
     @Test
-    void enabledConfigurationRequiresStandardBcryptHash() {
-        assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "{bcrypt}encoded"))
+    void enabledConfigurationRejectsPlaintextAndMalformedDigest() {
+        assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "plaintext"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("标准裸 BCrypt 哈希");
+                .hasMessageContaining("40位小写SHA-1摘要");
     }
 
     @Test
-    void enabledConfigurationRejectsBcryptHashWithUnsupportedCost() {
-        assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "$2b$32$" + "A".repeat(53)))
+    void enabledConfigurationRejectsEmptyDigest() {
+        assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "da39a3ee5e6b4b0d3255bfef95601890afd80709"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("标准裸 BCrypt 哈希");
+                .hasMessageContaining("40位小写SHA-1摘要");
+    }
+
+    @Test
+    void enabledConfigurationRejectsUppercaseDigestAndBcrypt() {
+        assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "A".repeat(40)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new AuthSuperAdminProperties(true, "admin", "$2b$12$" + "A".repeat(53)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -40,12 +48,25 @@ class AuthSuperAdminPropertiesTest {
         AuthSuperAdminProperties properties = new AuthSuperAdminProperties(
                 true,
                 " platform-admin ",
-                " $2b$12$" + "A".repeat(53) + " "
+                " 0123456789abcdef0123456789abcdef01234567 "
         );
 
         assertThat(properties.configured()).isTrue();
         assertThat(properties.matchesUsername(" platform-admin ")).isTrue();
         assertThat(properties.username()).isEqualTo("platform-admin");
-        assertThat(properties.passwordHash()).startsWith("$2b$12$");
+        assertThat(properties.passwordDigest()).isEqualTo("0123456789abcdef0123456789abcdef01234567");
+    }
+
+    @Test
+    void toStringMustRedactSuperAdminIdentityAndDigest() {
+        AuthSuperAdminProperties properties = new AuthSuperAdminProperties(
+                true, "platform-admin", "0123456789abcdef0123456789abcdef01234567");
+
+        assertThat(properties.toString())
+                .contains("enabled=true")
+                .contains("username=[REDACTED]")
+                .contains("passwordDigest=[REDACTED]")
+                .doesNotContain("platform-admin")
+                .doesNotContain("0123456789abcdef0123456789abcdef01234567");
     }
 }

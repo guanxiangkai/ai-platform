@@ -76,10 +76,10 @@ public class OssLogServiceImpl
     }
 
     @Override
-    public OssLogVO detail(String id) {
-        OssLog entity = requireEntity(id);
+    protected OssLog requireEntity(String id) {
+        OssLog entity = super.requireEntity(id);
         SuperAdminLogVisibility.requireVisible(entity, getEntityName(), id);
-        return super.detail(id);
+        return entity;
     }
 
     @Override
