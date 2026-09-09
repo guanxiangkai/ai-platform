@@ -85,7 +85,7 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
     @Transactional(rollbackFor = Exception.class)
     public void update(String id, MenuDTO dto) {
         Menu existing = repository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> BizException.notFound("菜单", id));
+                .orElseThrow(() -> io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id));
         ensureMenuWriteAllowed(existing, dto.parentId(), dto.path(), dto.component(), dto.permission());
         Set<String> affectedUserIds = findUserIdsByMenu(id);
         super.update(id, dto);
@@ -97,7 +97,7 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
     @Transactional(rollbackFor = Exception.class)
     public void delete(String id) {
         Menu existing = repository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> BizException.notFound("菜单", id));
+                .orElseThrow(() -> io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id));
         ensureMenuWriteAllowed(existing, null, null, null, null);
         Set<String> affectedUserIds = findUserIdsByMenu(id);
         super.delete(id);
@@ -289,7 +289,7 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
             return false;
         }
         ensureMenuWriteAllowed(repository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> BizException.notFound("菜单", id)), null, null, null, null);
+                .orElseThrow(() -> io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id)), null, null, null, null);
 
         try {
             Set<String> affectedUserIds = findUserIdsByMenu(id);
@@ -513,10 +513,10 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
 
     @Override
     public MenuVO detail(String id) {
-        if (hiddenTenantMenuIds().contains(id)) throw BizException.notFound("菜单", id);
+        if (hiddenTenantMenuIds().contains(id)) throw io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id);
         MenuVO menu = super.detail(id);
         if (!TenantMenuVisibility.isPlatformSuperAdmin() && TenantMenuVisibility.isTenantNode(menu)) {
-            throw BizException.notFound("菜单", id);
+            throw io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id);
         }
         fillTypeLabel(menu);
         return menu;
@@ -562,7 +562,7 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
     @Transactional(rollbackFor = Exception.class)
     public void updateEnabled(String id, Boolean enabled) {
         ensureMenuWriteAllowed(repository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> BizException.notFound("菜单", id)), null, null, null, null);
+                .orElseThrow(() -> io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id)), null, null, null, null);
         super.updateEnabled(id, enabled);
         evictAuthorizationUsers(findUserIdsByMenu(id));
         refreshAuthUsers(findUserIdsByMenu(id));
