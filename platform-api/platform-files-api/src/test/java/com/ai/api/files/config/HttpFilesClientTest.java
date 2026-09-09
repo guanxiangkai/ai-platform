@@ -109,15 +109,50 @@ class HttpFilesClientTest {
                 "a.txt", "text/plain", "finance-project", "project-1", "原件/合同", "invoice", "invoice-1");
         assertThat(upload.file().versionId()).isEqualTo("version-1");
 
-        FilesClient nodesClient = client(request -> json(HttpStatus.OK, """
+        AtomicReference<ClientRequest> nodesRequest = new AtomicReference<>();
+        FilesClient nodesClient = client(request -> {
+            nodesRequest.set(request);
+            return json(HttpStatus.OK, """
                 {"code":200,"message":"ok","data":{"records":[{"id":"folder-1","parentId":"root-1",
                 "name":"原件","displayPath":"/项目/原件","type":"FOLDER"}],"total":1,"page":1,"size":50,
                 "hasMore":false},"timestamp":1}
-                """));
+                """);
+        });
         FileBusinessRootNodePageDTO nodes = nodesClient.listBusinessRootNodes("finance-project", "project-1",
-                null, 1, 50);
+                null, "FILE", 1, 50);
         assertThat(nodes.records()).hasSize(1);
         assertThat(nodes.hasMore()).isFalse();
+        assertThat(nodesRequest.get().url().getQuery()).contains("nodeType=FILE");
+    }
+
+    @Test
+    void fileMigrationOperationsShouldUseTypedMetadataAndPlaceEndpoints() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        FilesClient metadataClient = client(request -> {
+            captured.set(request);
+            return json(HttpStatus.OK, """
+                    {"code":200,"message":"ok","data":{"file":{"fileId":"file-1","versionId":"version-1",
+                    "originName":"a.pdf","storeName":"objects/a","contentType":"application/pdf","size":1,
+                    "url":"/files/file-1","hash":"hash"},"rootId":null,"parentId":"legacy-folder",
+                    "relativePath":null,"displayPath":"/旧目录/a.pdf"},"timestamp":1}
+                    """);
+        });
+        assertThat(metadataClient.fileMetadata("file-1", null).rootId()).isNull();
+        assertThat(captured.get().url().getPath()).isEqualTo("/internal/files/metadata");
+
+        FilesClient placeClient = client(request -> {
+            captured.set(request);
+            return json(HttpStatus.OK, """
+                    {"code":200,"message":"ok","data":{"file":{"fileId":"file-1","versionId":"version-1",
+                    "originName":"a.pdf","storeName":"objects/a","contentType":"application/pdf","size":1,
+                    "url":"/files/file-1","hash":"hash"},"rootId":"root-1","parentId":"folder-1",
+                    "relativePath":"原件/a.pdf","displayPath":"/项目/原件/a.pdf"},"timestamp":1}
+                    """);
+        });
+        assertThat(placeClient.placeBusinessFile("finance-project", "project-1", "file-1", "version-1",
+                "原件/a.pdf").relativePath()).isEqualTo("原件/a.pdf");
+        assertThat(captured.get().url().getPath()).isEqualTo("/internal/files/business-roots/place");
+        assertThat(captured.get().url().getQuery()).contains("expectedCurrentVersionId=version-1");
     }
 
     @Test

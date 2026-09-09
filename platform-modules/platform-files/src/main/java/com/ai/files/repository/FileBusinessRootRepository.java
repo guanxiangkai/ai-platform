@@ -14,6 +14,9 @@ public interface FileBusinessRootRepository extends JpaRepository<FileBusinessRo
     Optional<FileBusinessRoot> findByTenantIdAndBusinessTypeAndBusinessIdAndDeletedFalse(
             String tenantId, String businessType, String businessId);
 
+    /** 按当前租户和根节点查询业务根目录绑定。 */
+    Optional<FileBusinessRoot> findByTenantIdAndRootNodeIdAndDeletedFalse(String tenantId, String rootNodeId);
+
     /** 判断节点是否为活动业务根目录，避免通用回收误处理根目录。 */
     boolean existsByRootNodeIdAndDeletedFalse(String rootNodeId);
 }

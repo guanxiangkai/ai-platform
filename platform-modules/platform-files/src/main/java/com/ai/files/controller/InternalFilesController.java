@@ -74,9 +74,29 @@ public class InternalFilesController {
             @RequestParam String businessType,
             @RequestParam String businessId,
             @RequestParam(required = false) String parentId,
+            @RequestParam(required = false) String nodeType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return ApiResponse.ok(filesService.businessRootNodes(businessType, businessId, parentId, page, size));
+        return ApiResponse.ok(filesService.businessRootNodes(businessType, businessId, parentId, nodeType, page, size));
+    }
+
+    /** 查询文件指定版本或当前版本的真实元数据和业务根目录位置。 */
+    @GetMapping("/metadata")
+    public ApiResponse<FileBusinessUploadDTO> fileMetadata(@RequestParam String fileId,
+                                                           @RequestParam(required = false) String versionId) {
+        return ApiResponse.ok(filesService.fileMetadata(fileId, versionId));
+    }
+
+    /** 在不重传对象和不改写版本的前提下将既有文件节点迁入业务根目录。 */
+    @PostMapping("/business-roots/place")
+    public ApiResponse<FileBusinessUploadDTO> placeBusinessFile(
+            @RequestParam String rootBusinessType,
+            @RequestParam String rootBusinessId,
+            @RequestParam String fileId,
+            @RequestParam String expectedCurrentVersionId,
+            @RequestParam String relativePath) {
+        return ApiResponse.ok(filesService.placeBusinessFile(rootBusinessType, rootBusinessId, fileId,
+                expectedCurrentVersionId, relativePath));
     }
 
     /** 下载当前租户的内部业务附件。 */

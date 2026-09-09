@@ -653,7 +653,7 @@ public class FilesService {
 
     /** 分页读取业务根目录或其子目录的直属活动节点。 */
     public FileBusinessRootNodePageDTO businessRootNodes(String businessType, String businessId,
-                                                          String parentId, int page, int size) {
+                                                          String parentId, String nodeType, int page, int size) {
         requireInternalService();
         int safePage = Math.max(1, page);
         int safeSize = Math.min(200, Math.max(1, size));
@@ -661,14 +661,76 @@ public class FilesService {
         FileSpace space = systemSpace();
         FileNode root = requireBusinessRootNode(binding, space);
         FileNode parent = resolveBusinessRootParent(space, root, parentId);
-        Page<FileNode> result = nodeRepository.findBySpaceIdAndParentIdAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
-                space.getId(), parent.getId(), FileNodeState.ACTIVE, PageRequest.of(safePage - 1, safeSize));
+        FileNodeType type = parseNodeType(nodeType);
+        Page<FileNode> result = type == null
+                ? nodeRepository.findBySpaceIdAndParentIdAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
+                        space.getId(), parent.getId(), FileNodeState.ACTIVE, PageRequest.of(safePage - 1, safeSize))
+                : nodeRepository.findBySpaceIdAndParentIdAndNodeTypeAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
+                        space.getId(), parent.getId(), type, FileNodeState.ACTIVE, PageRequest.of(safePage - 1, safeSize));
         List<FileBusinessRootNodeDTO> records = result.getContent().stream()
                 .map(node -> new FileBusinessRootNodeDTO(node.getId(), node.getParentId(), node.getNodeName(),
                         node.getDisplayPath(), node.getNodeType().name()))
                 .toList();
         return new FileBusinessRootNodePageDTO(records, result.getTotalElements(), safePage, safeSize,
                 result.hasNext());
+    }
+
+    /** 查询文件指定版本或当前版本在当前租户业务根目录中的真实位置。 */
+    public FileBusinessUploadDTO fileMetadata(String fileId, String versionId) {
+        requireInternalService();
+        FileNode node = requireCurrentTenantFile(fileId);
+        FileVersion version = availableVersion(node, versionId);
+        FileBusinessRoot binding = businessRootForNode(node);
+        String rootId = binding == null ? null : binding.getRootNodeId();
+        String relativePath = binding == null ? null : relativePath(binding, node);
+        return new FileBusinessUploadDTO(uploadResult(node, version), rootId, node.getParentId(), relativePath,
+                node.getDisplayPath());
+    }
+
+    /** 在锁定空间和文件节点后将既有文件迁入业务根目录，不重传对象也不改写版本。 */
+    public FileBusinessUploadDTO placeBusinessFile(String rootBusinessType, String rootBusinessId, String fileId,
+                                                    String expectedCurrentVersionId, String relativePath) {
+        requireInternalService();
+        String type = businessScope(rootBusinessType, 64, "根业务类型无效");
+        String id = businessScope(rootBusinessId, 128, "根业务标识无效");
+        String path = normalizeRelativePath(relativePath);
+        int lastSeparator = path.lastIndexOf('/');
+        String filename = safeName(path.substring(lastSeparator + 1));
+        String directory = lastSeparator < 0 ? "" : path.substring(0, lastSeparator);
+        String expectedVersion = businessScope(expectedCurrentVersionId, 64, "预期当前版本标识无效");
+        FileSpace systemSpace = systemSpace();
+        return Objects.requireNonNull(transactionTemplate.execute(status -> {
+            FileSpace space = spaceRepository.findLockedByIdAndTenantId(systemSpace.getId(), requireTenantId())
+                    .orElseThrow(() -> new BizException("系统文件空间不存在"));
+            FileNode root = requireBusinessRootNode(requireBusinessRoot(type, id), space);
+            FileNode node = nodeRepository.findLockedByIdAndTenantId(requireText(fileId, "文件标识不能为空"), requireTenantId())
+                    .orElseThrow(() -> new BizException("文件节点不存在"));
+            if (!requireTenantId().equals(node.getTenantId()) || node.getNodeType() != FileNodeType.FILE
+                    || node.getNodeState() != FileNodeState.ACTIVE) {
+                throw new BizException("文件不属于当前租户的活动文件节点");
+            }
+            if (!space.getId().equals(node.getSpaceId())) {
+                throw new BizException("文件不在当前租户系统空间");
+            }
+            if (!expectedVersion.equals(node.getCurrentVersionId())) {
+                throw new BizException("文件当前版本已变更");
+            }
+            if (StringUtils.hasText(node.getActiveUploadId())) {
+                throw new BizException("文件正在上传，暂不能迁移目录");
+            }
+            if (!filename.equals(node.getNodeName())) {
+                throw new BizException("相对路径的文件名与当前文件名不一致");
+            }
+            FileVersion version = availableVersion(node, expectedVersion);
+            FileNode parent = resolveBusinessPath(space, root, directory);
+            ensureNameAvailable(space.getId(), parent.getId(), node.getNodeName(), node.getId());
+            node.setParentId(parent.getId());
+            node.setDisplayPath(parent.getDisplayPath() + "/" + node.getNodeName());
+            nodeRepository.save(node);
+            audit(FileOperationType.MOVE, space.getId(), node.getId(), "迁入业务根目录=" + root.getId());
+            return new FileBusinessUploadDTO(uploadResult(node, version), root.getId(), parent.getId(), path,
+                    node.getDisplayPath());
+        }));
     }
 
     /**
@@ -842,20 +904,73 @@ public class FilesService {
             if (!rootId.equals(parent.getId())) {
                 throw new BizException("业务根目录绑定已变更");
             }
-            for (String segment : relativePath.isEmpty() ? List.<String>of() : List.of(relativePath.split("/"))) {
-                FileNode current = parent;
-                parent = nodeRepository.findBySpaceIdAndParentIdAndNodeNameAndNodeStateAndDeletedFalse(
-                                space.getId(), current.getId(), segment, FileNodeState.ACTIVE)
-                        .map(node -> {
-                            if (node.getNodeType() != FileNodeType.FOLDER) {
-                                throw new BizException("业务目录名称冲突");
-                            }
-                            return node;
-                        })
-                        .orElseGet(() -> nodeRepository.save(newNode(space, current, segment, FileNodeType.FOLDER)));
-            }
-            return parent;
+            return resolveBusinessPath(space, parent, relativePath);
         }));
+    }
+
+    private FileNode resolveBusinessPath(FileSpace space, FileNode root, String relativePath) {
+        FileNode parent = root;
+        for (String segment : relativePath.isEmpty() ? List.<String>of() : List.of(relativePath.split("/"))) {
+            FileNode current = parent;
+            parent = nodeRepository.findBySpaceIdAndParentIdAndNodeNameAndNodeStateAndDeletedFalse(
+                            space.getId(), current.getId(), segment, FileNodeState.ACTIVE)
+                    .map(node -> {
+                        if (node.getNodeType() != FileNodeType.FOLDER) {
+                            throw new BizException("业务目录名称冲突");
+                        }
+                        return node;
+                    })
+                    .orElseGet(() -> nodeRepository.save(newNode(space, current, segment, FileNodeType.FOLDER)));
+        }
+        return parent;
+    }
+
+    private FileNode requireCurrentTenantFile(String fileId) {
+        FileNode node = requireActiveNode(fileId);
+        if (!requireTenantId().equals(node.getTenantId()) || node.getNodeType() != FileNodeType.FILE) {
+            throw new BizException("文件不属于当前租户的活动文件节点");
+        }
+        return node;
+    }
+
+    private FileVersion availableVersion(FileNode node, String versionId) {
+        String selectedVersionId = StringUtils.hasText(versionId) ? versionId.trim() : node.getCurrentVersionId();
+        return versionRepository.findByIdAndNodeIdAndTenantIdAndVersionStateAndDeletedFalse(
+                        requireText(selectedVersionId, "文件版本标识不能为空"), node.getId(), requireTenantId(),
+                        FileVersionState.AVAILABLE)
+                .orElseThrow(() -> new BizException("文件版本不存在"));
+    }
+
+    private FileBusinessRoot businessRootForNode(FileNode node) {
+        FileNode current = node;
+        while (current != null) {
+            FileBusinessRoot root = businessRootRepository
+                    .findByTenantIdAndRootNodeIdAndDeletedFalse(requireTenantId(), current.getId()).orElse(null);
+            if (root != null) {
+                return root;
+            }
+            current = StringUtils.hasText(current.getParentId()) ? requireCurrentTenantNode(current.getParentId()) : null;
+        }
+        return null;
+    }
+
+    private String relativePath(FileBusinessRoot binding, FileNode node) {
+        FileNode root = requireBusinessRootNode(binding, systemSpace());
+        String prefix = root.getDisplayPath() + "/";
+        return node.getDisplayPath().startsWith(prefix) ? node.getDisplayPath().substring(prefix.length()) : null;
+    }
+
+    private FileNode requireCurrentTenantNode(String nodeId) {
+        FileNode node = requireActiveNode(nodeId);
+        if (!requireTenantId().equals(node.getTenantId())) {
+            throw new BizException("文件节点不属于当前租户");
+        }
+        return node;
+    }
+
+    private FileUploadResultDTO uploadResult(FileNode node, FileVersion version) {
+        return new FileUploadResultDTO(node.getId(), version.getId(), version.getOriginalName(), version.getObjectKey(),
+                version.getContentType(), version.getSizeBytes(), "/files/" + node.getId(), version.getSha256());
     }
 
     private FileNode resolveBusinessRootParent(FileSpace space, FileNode root, String parentId) {
@@ -940,6 +1055,15 @@ public class FilesService {
         if (!StringUtils.hasText(value) || value.trim().length() > maxLength
                 || value.chars().anyMatch(Character::isISOControl)) throw new BizException(message);
         return value.trim();
+    }
+
+    private static FileNodeType parseNodeType(String rawType) {
+        if (!StringUtils.hasText(rawType)) return null;
+        try {
+            return FileNodeType.valueOf(rawType.trim());
+        } catch (IllegalArgumentException exception) {
+            throw new BizException("文件节点类型无效");
+        }
     }
 
     private FileNode systemBusinessFolder(FileSpace space, String businessType, String businessId) {

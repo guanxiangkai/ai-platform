@@ -3,9 +3,13 @@ package com.ai.files.service;
 import com.ai.files.config.FilesProperties;
 import com.ai.files.domain.FileRecordStatus;
 import com.ai.files.domain.FileSpaceType;
+import com.ai.files.domain.FileNodeState;
+import com.ai.files.domain.FileNodeType;
+import com.ai.files.domain.FileVersionState;
 import com.ai.files.domain.entity.FileBusinessRoot;
 import com.ai.files.domain.entity.FileNode;
 import com.ai.files.domain.entity.FileSpace;
+import com.ai.files.domain.entity.FileVersion;
 import com.ai.files.repository.FileBusinessRootRepository;
 import com.ai.files.repository.FileEditLockRepository;
 import com.ai.files.repository.FileGrantRepository;
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
@@ -44,6 +49,7 @@ class FilesServiceBusinessRootsTest {
     private FileBusinessRootRepository rootRepository;
     private FileNodeRepository nodeRepository;
     private FileUploadService uploadService;
+    private FileVersionRepository versions;
     private FilesService service;
     private FileSpaceRepository spaces;
     private FileSpace systemSpace;
@@ -74,6 +80,8 @@ class FilesServiceBusinessRootsTest {
             roots.put(key(root.getBusinessType(), root.getBusinessId()), root);
             return root;
         });
+        when(rootRepository.findByTenantIdAndRootNodeIdAndDeletedFalse(any(), any())).thenAnswer(invocation ->
+                roots.values().stream().filter(root -> root.getRootNodeId().equals(invocation.getArgument(1))).findFirst());
 
         nodeRepository = mock(FileNodeRepository.class);
         when(nodeRepository.save(any(FileNode.class))).thenAnswer(invocation -> {
@@ -94,7 +102,8 @@ class FilesServiceBusinessRootsTest {
         uploadService = mock(FileUploadService.class);
         FilesProperties properties = mock(FilesProperties.class);
         when(properties.resolvedMaxFileSizeBytes()).thenReturn(100L);
-        service = new FilesService(spaces, nodeRepository, rootRepository, mock(FileVersionRepository.class),
+        versions = mock(FileVersionRepository.class);
+        service = new FilesService(spaces, nodeRepository, rootRepository, versions,
                 mock(FileGrantRepository.class), mock(FileEditLockRepository.class), mock(FileOperationLogRepository.class),
                 access, mock(FileObjectStorage.class), uploadService, properties, transactions);
         UserContextHolder.set(new UserContext("internal-service", "tenant-a", false, null,
@@ -181,6 +190,83 @@ class FilesServiceBusinessRootsTest {
         assertThat(uploaded.displayPath()).endsWith("/原件/凭证/凭证.txt");
         assertThat(uploaded.file().versionId()).isEqualTo("version-1");
         org.mockito.Mockito.verify(service).upload("system-space", uploaded.parentId(), part, "invoice", "invoice-1", null);
+    }
+
+    @Test
+    void placeBusinessFileShouldMoveNodeWithoutCreatingAStorageVersionAndExposeCurrentMetadata() {
+        var root = service.ensureBusinessRoot("finance-project", "project-1", "项目甲");
+        FileNode file = new FileNode();
+        file.setId("file-1"); file.setTenantId("tenant-a"); file.setSpaceId("system-space");
+        file.setNodeType(FileNodeType.FILE); file.setNodeState(FileNodeState.ACTIVE);
+        file.setNodeName("原件.pdf"); file.setDisplayPath("/历史/原件.pdf"); file.setCurrentVersionId("version-1");
+        nodesById.put(file.getId(), file);
+        when(nodeRepository.findLockedByIdAndTenantId("file-1", "tenant-a")).thenReturn(Optional.of(file));
+        FileVersion version = new FileVersion();
+        version.setId("version-1"); version.setTenantId("tenant-a"); version.setNodeId("file-1");
+        version.setVersionNo(1); version.setVersionState(FileVersionState.AVAILABLE); version.setObjectKey("objects/original");
+        version.setOriginalName("原件.pdf"); version.setContentType("application/pdf"); version.setSizeBytes(8L); version.setSha256("hash-1");
+        when(versions.findByIdAndNodeIdAndTenantIdAndVersionStateAndDeletedFalse(
+                "version-1", "file-1", "tenant-a", FileVersionState.AVAILABLE)).thenReturn(Optional.of(version));
+
+        var placed = service.placeBusinessFile("finance-project", "project-1", "file-1", "version-1",
+                "原件/合同/原件.pdf");
+
+        assertThat(placed.rootId()).isEqualTo(root.rootId());
+        assertThat(placed.parentId()).isNotEqualTo(root.rootId());
+        assertThat(file.getDisplayPath()).endsWith("/原件/合同/原件.pdf");
+        assertThat(placed.file().versionId()).isEqualTo("version-1");
+        assertThat(placed.file().storeName()).isEqualTo("objects/original");
+        assertThat(placed.file().hash()).isEqualTo("hash-1");
+        assertThat(service.fileMetadata("file-1", null)).isEqualTo(placed);
+        FileVersion historical = new FileVersion();
+        historical.setId("version-old"); historical.setTenantId("tenant-a"); historical.setNodeId("file-1");
+        historical.setVersionNo(0); historical.setVersionState(FileVersionState.AVAILABLE);
+        historical.setObjectKey("objects/original-old"); historical.setOriginalName("原件.pdf");
+        historical.setContentType("application/pdf"); historical.setSizeBytes(7L); historical.setSha256("hash-old");
+        when(versions.findByIdAndNodeIdAndTenantIdAndVersionStateAndDeletedFalse(
+                "version-old", "file-1", "tenant-a", FileVersionState.AVAILABLE)).thenReturn(Optional.of(historical));
+        assertThat(service.fileMetadata("file-1", "version-old").file().versionId()).isEqualTo("version-old");
+        org.mockito.Mockito.verifyNoInteractions(uploadService);
+    }
+
+    @Test
+    void placeBusinessFileShouldRejectChangedVersionOtherTenantAndRenamedPath() {
+        service.ensureBusinessRoot("finance-project", "project-1", "项目甲");
+        FileNode file = new FileNode();
+        file.setId("file-1"); file.setTenantId("tenant-a"); file.setSpaceId("system-space");
+        file.setNodeType(FileNodeType.FILE); file.setNodeState(FileNodeState.ACTIVE);
+        file.setNodeName("原件.pdf"); file.setDisplayPath("/历史/原件.pdf"); file.setCurrentVersionId("version-2");
+        when(nodeRepository.findLockedByIdAndTenantId("file-1", "tenant-a")).thenReturn(Optional.of(file));
+        assertThatThrownBy(() -> service.placeBusinessFile("finance-project", "project-1", "file-1", "version-1",
+                        "原件/原件.pdf")).hasMessage("文件当前版本已变更");
+        file.setCurrentVersionId("version-1"); file.setTenantId("tenant-b");
+        assertThatThrownBy(() -> service.placeBusinessFile("finance-project", "project-1", "file-1", "version-1",
+                        "原件/原件.pdf")).hasMessage("文件不属于当前租户的活动文件节点");
+        file.setTenantId("tenant-a");
+        assertThatThrownBy(() -> service.placeBusinessFile("finance-project", "project-1", "file-1", "version-1",
+                        "原件/已改名.pdf")).hasMessage("相对路径的文件名与当前文件名不一致");
+    }
+
+    @Test
+    void businessRootNodesShouldApplyNodeTypeBeforePaginationAndRejectInvalidType() {
+        var root = service.ensureBusinessRoot("finance-project", "project-1", "项目甲");
+        FileNode file = new FileNode();
+        file.setId("file-1"); file.setParentId(root.rootId()); file.setNodeName("原件.pdf");
+        file.setDisplayPath(root.displayPath() + "/原件.pdf"); file.setNodeType(FileNodeType.FILE);
+        @SuppressWarnings("unchecked") Page<FileNode> page = mock(Page.class);
+        when(page.getContent()).thenReturn(java.util.List.of(file)); when(page.getTotalElements()).thenReturn(1L);
+        when(page.hasNext()).thenReturn(false);
+        when(nodeRepository.findBySpaceIdAndParentIdAndNodeTypeAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
+                org.mockito.ArgumentMatchers.eq("system-space"), org.mockito.ArgumentMatchers.eq(root.rootId()),
+                org.mockito.ArgumentMatchers.eq(FileNodeType.FILE), org.mockito.ArgumentMatchers.eq(FileNodeState.ACTIVE), any()))
+                .thenReturn(page);
+
+        var result = service.businessRootNodes("finance-project", "project-1", null, "FILE", 1, 50);
+
+        assertThat(result.total()).isEqualTo(1L);
+        assertThat(result.records()).extracting(item -> item.type()).containsExactly("FILE");
+        assertThatThrownBy(() -> service.businessRootNodes("finance-project", "project-1", null, "OTHER", 1, 50))
+                .hasMessage("文件节点类型无效");
     }
 
     private static String key(String businessType, String businessId) {

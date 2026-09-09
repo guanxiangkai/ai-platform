@@ -109,15 +109,40 @@ final class HttpFilesClient implements FilesClient {
 
     @Override
     public FileBusinessRootNodePageDTO listBusinessRootNodes(String businessType, String businessId,
-                                                              String parentId, int page, int size) {
+                                                              String parentId, String nodeType, int page, int size) {
         ApiResponse<FileBusinessRootNodePageDTO> response = request(webClient.get()
                         .uri(uriBuilder -> uriBuilder.path("/internal/files/business-roots/nodes")
                                 .queryParam("businessType", businessType)
                                 .queryParam("businessId", businessId)
                                 .queryParamIfPresent("parentId", java.util.Optional.ofNullable(parentId))
+                                .queryParamIfPresent("nodeType", java.util.Optional.ofNullable(nodeType))
                                 .queryParam("page", page).queryParam("size", size).build()),
                 BUSINESS_ROOT_NODES_RESPONSE, properties.getBusinessFileOperationTimeout(), "查询业务根目录节点");
         return requiredData(response, "查询业务根目录节点");
+    }
+
+    @Override
+    public FileBusinessUploadDTO fileMetadata(String fileId, String versionId) {
+        ApiResponse<FileBusinessUploadDTO> response = request(webClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/internal/files/metadata")
+                                .queryParam("fileId", fileId)
+                                .queryParamIfPresent("versionId", java.util.Optional.ofNullable(versionId)).build()),
+                BUSINESS_UPLOAD_RESPONSE, properties.getBusinessFileOperationTimeout(), "查询文件元数据");
+        return requiredData(response, "查询文件元数据");
+    }
+
+    @Override
+    public FileBusinessUploadDTO placeBusinessFile(String rootBusinessType, String rootBusinessId, String fileId,
+                                                   String expectedCurrentVersionId, String relativePath) {
+        ApiResponse<FileBusinessUploadDTO> response = request(webClient.post()
+                        .uri(uriBuilder -> uriBuilder.path("/internal/files/business-roots/place")
+                                .queryParam("rootBusinessType", rootBusinessType)
+                                .queryParam("rootBusinessId", rootBusinessId)
+                                .queryParam("fileId", fileId)
+                                .queryParam("expectedCurrentVersionId", expectedCurrentVersionId)
+                                .queryParam("relativePath", relativePath).build()),
+                BUSINESS_UPLOAD_RESPONSE, properties.getBusinessFileOperationTimeout(), "迁入业务根目录");
+        return requiredData(response, "迁入业务根目录");
     }
 
     @Override

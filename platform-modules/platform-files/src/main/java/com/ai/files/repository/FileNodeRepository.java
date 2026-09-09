@@ -36,6 +36,10 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
     Page<FileNode> findBySpaceIdAndParentIdAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
             String spaceId, String parentId, FileNodeState state, Pageable pageable);
 
+    /** 分页查询目录中指定类型的活动节点。 */
+    Page<FileNode> findBySpaceIdAndParentIdAndNodeTypeAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
+            String spaceId, String parentId, FileNodeType type, FileNodeState state, Pageable pageable);
+
     /** 查询同目录同名活动节点。 */
     Optional<FileNode> findBySpaceIdAndParentIdAndNodeNameAndNodeStateAndDeletedFalse(
             String spaceId, String parentId, String nodeName, FileNodeState state);

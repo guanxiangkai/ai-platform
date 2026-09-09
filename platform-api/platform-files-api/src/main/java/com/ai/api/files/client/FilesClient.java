@@ -43,7 +43,14 @@ public interface FilesClient {
 
     /** 分页读取业务根目录内一个父节点的直属节点。 */
     FileBusinessRootNodePageDTO listBusinessRootNodes(String businessType, String businessId,
-                                                       String parentId, int page, int size);
+                                                       String parentId, String nodeType, int page, int size);
+
+    /** 查询文件指定版本或当前版本在业务根目录中的真实位置。 */
+    FileBusinessUploadDTO fileMetadata(String fileId, String versionId);
+
+    /** 将既有文件节点放入已存在业务根目录内的完整相对路径。 */
+    FileBusinessUploadDTO placeBusinessFile(String rootBusinessType, String rootBusinessId, String fileId,
+                                            String expectedCurrentVersionId, String relativePath);
 
     /**
      * 查询当前租户指定业务记录关联的活动文件。
