@@ -17,8 +17,9 @@ import java.io.Serial;
 @EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "file_business_root", comment = "业务文件根目录绑定表",
-        uniqueConstraints = @UniqueConstraint(name = "uk_file_business_root_tenant_business",
-                columnNames = {"tenant_id", "business_type", "business_id"}))
+        uniqueConstraints = {@UniqueConstraint(name = "uk_file_business_root_tenant_business",
+                columnNames = {"tenant_id", "business_type", "business_id"}),
+                @UniqueConstraint(name = "uk_file_business_root_node", columnNames = {"root_node_id"})})
 public class FileBusinessRoot extends DataTenantEntity {
 
     @Serial
