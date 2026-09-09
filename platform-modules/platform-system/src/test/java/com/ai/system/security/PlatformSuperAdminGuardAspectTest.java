@@ -1,8 +1,8 @@
 package com.ai.system.security;
 
 import com.ai.api.security.PlatformSuperAdmin;
-import io.github.guanxiangkai.web.plus.core.context.CurrentUser;
-import io.github.guanxiangkai.web.plus.core.context.CurrentUserHolder;
+import io.github.guanxiangkai.web.plus.security.context.UserContext;
+import io.github.guanxiangkai.web.plus.security.context.UserContextHolder;
 import com.ai.system.controller.TenantController;
 import com.ai.system.service.ITenantService;
 import static org.mockito.Mockito.mock;
@@ -19,22 +19,22 @@ class PlatformSuperAdminGuardAspectTest {
 
     @AfterEach
     void clearUser() {
-        CurrentUserHolder.clear();
+        UserContextHolder.clear();
     }
 
     @Test
     void deniesAnonymousOrdinaryAndForgedSuperAdminClaims() {
         Fixture proxy = proxy();
         assertDenied(proxy);
-        CurrentUserHolder.set(user("tenant-admin", false, "*"));
+        UserContextHolder.set(user("tenant-admin", false, "*"));
         assertDenied(proxy);
-        CurrentUserHolder.set(user("forged", true, "*"));
+        UserContextHolder.set(user("forged", true, "*"));
         assertDenied(proxy);
     }
 
     @Test
     void allowsOnlyFixedPlatformSuperAdminIdentity() {
-        CurrentUserHolder.set(user(PlatformSuperAdmin.USER_ID, true, "*"));
+        UserContextHolder.set(user(PlatformSuperAdmin.USER_ID, true, "*"));
         assertThat(proxy().options().data()).isEmpty();
     }
 
@@ -49,9 +49,9 @@ class PlatformSuperAdminGuardAspectTest {
                 .hasMessageContaining("平台超级管理员");
     }
 
-    private static CurrentUser user(String id, boolean superAdmin, String... permissions) {
-        return new CurrentUser(id, null, "tenant-1", null, java.util.Set.of(), java.util.Set.of(),
-                java.util.Set.of(permissions), superAdmin, null, System.currentTimeMillis(), java.util.Map.of());
+    private static UserContext user(String id, boolean superAdmin, String... permissions) {
+        return new UserContext(id, "tenant-1", superAdmin, null, java.util.Set.of(), java.util.Set.of(),
+                java.util.Set.of(permissions), java.util.Map.of());
     }
 
     static class Fixture extends TenantController {

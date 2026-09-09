@@ -6,8 +6,8 @@ import com.ai.system.domain.dto.TenantPageDTO;
 import com.ai.system.domain.vo.TenantPageVO;
 import com.ai.system.domain.vo.TenantVO;
 import com.ai.system.service.ITenantService;
-import io.github.guanxiangkai.web.plus.core.context.CurrentUser;
-import io.github.guanxiangkai.web.plus.core.context.CurrentUserHolder;
+import io.github.guanxiangkai.web.plus.security.context.UserContext;
+import io.github.guanxiangkai.web.plus.security.context.UserContextHolder;
 import io.github.guanxiangkai.web.plus.core.model.PageResponse;
 import org.aspectj.lang.annotation.Aspect;
 import org.junit.jupiter.api.AfterEach;
@@ -28,12 +28,12 @@ class TenantControllerGuardTest {
 
     @AfterEach
     void clearUser() {
-        CurrentUserHolder.clear();
+        UserContextHolder.clear();
     }
 
     @Test
     void inheritedCrudAndCustomTenantEndpointsRejectOrdinaryWildcardUser() {
-        CurrentUserHolder.set(user("tenant-admin", false));
+        UserContextHolder.set(user("tenant-admin", false));
         TenantController controller = proxy();
         assertThatThrownBy(() -> controller.options()).isInstanceOf(RuntimeException.class);
         assertThatThrownBy(() -> controller.checkTenantCode("tenant")).isInstanceOf(RuntimeException.class);
@@ -43,7 +43,7 @@ class TenantControllerGuardTest {
 
     @Test
     void everyInheritedTenantResourceOperationIsGuardedBeforeServiceInvocation() {
-        CurrentUserHolder.set(user("tenant-admin", false));
+        UserContextHolder.set(user("tenant-admin", false));
         TenantController controller = proxy();
         Set<String> operations = Set.of("list", "detail", "create", "update", "delete", "batchDelete",
                 "updateEnabled", "batchUpdateEnabled", "importData", "options", "checkTenantCode");
@@ -62,7 +62,7 @@ class TenantControllerGuardTest {
         when(service.options()).thenReturn(java.util.List.of());
         when(service.checkTenantCode("tenant")).thenReturn(true);
         when(service.list(org.mockito.ArgumentMatchers.any())).thenReturn(PageResponse.of(java.util.List.<TenantPageVO>of(), 0L, 1, 20));
-        CurrentUserHolder.set(user(PlatformSuperAdmin.USER_ID, true));
+        UserContextHolder.set(user(PlatformSuperAdmin.USER_ID, true));
         TenantController controller = proxy();
         controller.options();
         controller.checkTenantCode("tenant");
@@ -76,8 +76,7 @@ class TenantControllerGuardTest {
         return factory.getProxy();
     }
 
-    private static CurrentUser user(String id, boolean superAdmin) {
-        return new CurrentUser(id, null, "tenant-1", null, Set.of(), Set.of(), Set.of("*"), superAdmin,
-                null, System.currentTimeMillis(), Map.of());
+    private static UserContext user(String id, boolean superAdmin) {
+        return new UserContext(id, "tenant-1", superAdmin, null, Set.of(), Set.of(), Set.of("*"), Map.of());
     }
 }

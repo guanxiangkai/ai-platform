@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TenantMenuVisibilityTest {
 
     @org.junit.jupiter.api.AfterEach
-    void clearContext() { io.github.guanxiangkai.web.plus.core.context.CurrentUserHolder.clear(); }
+    void clearContext() { io.github.guanxiangkai.web.plus.security.context.UserContextHolder.clear(); }
 
     @Test
     void excludesPlainGrandchildrenOfPathOnlyTenantNodesWithoutHidingBasicAdministration() {

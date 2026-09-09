@@ -12,8 +12,8 @@ import com.ai.system.repository.UserRoleRepository;
 import com.ai.system.security.AuthUserCacheService;
 import com.ai.system.security.AuthorizationCacheService;
 import io.github.guanxiangkai.jpa.plus.interceptor.tenant.spi.TenantIdProvider;
-import io.github.guanxiangkai.web.plus.core.context.CurrentUser;
-import io.github.guanxiangkai.web.plus.core.context.CurrentUserHolder;
+import io.github.guanxiangkai.web.plus.security.context.UserContext;
+import io.github.guanxiangkai.web.plus.security.context.UserContextHolder;
 import io.github.guanxiangkai.web.plus.error.exception.PermissionDeniedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,12 +63,12 @@ class RoleTenantAdministrationTest {
         when(menus.findByIdAndDeletedFalse("tenant-child")).thenReturn(Optional.of(tenantChild));
         when(menus.findByIdAndDeletedFalse("user-menu")).thenReturn(Optional.of(ordinary));
         when(authUsers.getIfAvailable()).thenReturn(null);
-        CurrentUserHolder.set(user("tenant-admin", false));
+        UserContextHolder.set(user("tenant-admin", false));
     }
 
     @AfterEach
     void clearUser() {
-        CurrentUserHolder.clear();
+        UserContextHolder.clear();
     }
 
     @Test
@@ -118,7 +118,7 @@ class RoleTenantAdministrationTest {
 
     @Test
     void fixedPlatformSuperAdminDuplicateCopiesHiddenBindings() {
-        CurrentUserHolder.set(user(PlatformSuperAdmin.USER_ID, true));
+        UserContextHolder.set(user(PlatformSuperAdmin.USER_ID, true));
         when(roleMenus.findByRoleId("role-1")).thenReturn(List.of(
                 roleMenu("tenant-root"), roleMenu("tenant-child"), roleMenu("user-menu")));
 
@@ -159,8 +159,7 @@ class RoleTenantAdministrationTest {
         return menu;
     }
 
-    private static CurrentUser user(String id, boolean superAdmin) {
-        return new CurrentUser(id, null, "tenant-1", null, Set.of(), Set.of(), Set.of("*"), superAdmin,
-                null, System.currentTimeMillis(), Map.of());
+    private static UserContext user(String id, boolean superAdmin) {
+        return new UserContext(id, "tenant-1", superAdmin, null, Set.of(), Set.of(), Set.of("*"), Map.of());
     }
 }
