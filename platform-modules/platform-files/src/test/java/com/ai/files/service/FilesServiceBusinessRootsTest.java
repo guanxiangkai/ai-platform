@@ -186,4 +186,42 @@ class FilesServiceBusinessRootsTest {
     private static String key(String businessType, String businessId) {
         return businessType.length() + ":" + businessType + businessId;
     }
+
+    @Test
+    void realMultipartPreparationShouldPreserveTenantAndVersionAcrossWorkerThreads() {
+        String hook = "business-root-upload-test";
+        UserContext context = new UserContext("internal-service", "tenant-a", false, null,
+                Set.of(), Set.of(), Set.of(), Map.of());
+        // 手动构造的服务没有 Web 请求上下文桥；只在本测试内复现生产请求的线程上下文传递。
+        reactor.core.scheduler.Schedulers.onScheduleHook(hook, task -> () -> {
+            UserContextHolder.set(context);
+            try { task.run(); } finally { UserContextHolder.clear(); }
+        });
+        try {
+            var root = service.ensureBusinessRoot("finance-project", "multipart-project", "项目原件");
+            FilePart part = mock(FilePart.class);
+            HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.TEXT_PLAIN);
+            when(part.filename()).thenReturn("原件.txt"); when(part.headers()).thenReturn(headers);
+            when(part.transferTo(any(java.nio.file.Path.class))).thenAnswer(invocation -> Mono.fromRunnable(() -> {
+                try { java.nio.file.Files.writeString(invocation.getArgument(0), "x"); }
+                catch (java.io.IOException error) { throw new java.io.UncheckedIOException(error); }
+            }));
+            when(uploadService.upload(any(), any())).thenAnswer(invocation -> {
+                FileUploadTransactionService.UploadCommand command = invocation.getArgument(1);
+                assertThat(command.tenantId()).isEqualTo("tenant-a");
+                assertThat(command.userId()).isEqualTo("internal-service");
+                assertThat(command.originalName()).isEqualTo("原件.txt");
+                assertThat(command.sizeBytes()).isEqualTo(1);
+                return new com.ai.api.files.dto.FileUploadResultDTO("file-actual", "version-actual", "原件.txt",
+                        "object-actual", "text/plain", 1L, "/files/file-actual", command.sha256());
+            });
+            var uploaded = service.uploadToBusinessRoot(part, "finance-project", "multipart-project",
+                    "输入/原件.txt", "input", "input-1").block(java.time.Duration.ofSeconds(10));
+            assertThat(uploaded.rootId()).isEqualTo(root.rootId());
+            assertThat(uploaded.displayPath()).endsWith("/输入/原件.txt");
+            assertThat(uploaded.file().versionId()).isEqualTo("version-actual");
+        } finally {
+            reactor.core.scheduler.Schedulers.resetOnScheduleHook(hook);
+        }
+    }
 }
