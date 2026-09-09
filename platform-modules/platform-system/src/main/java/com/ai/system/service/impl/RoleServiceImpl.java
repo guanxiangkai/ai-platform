@@ -18,6 +18,8 @@ import com.ai.system.repository.RoleRepository;
 import com.ai.system.repository.UserRoleRepository;
 import com.ai.system.security.AuthUserCacheService;
 import com.ai.system.security.AuthorizationCacheService;
+import com.ai.system.security.TenantMenuVisibility;
+import com.ai.system.repository.MenuRepository;
 import com.ai.system.service.IRoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +51,7 @@ public class RoleServiceImpl extends BaseServiceImpl<RolePageDTO, RolePageVO, Ro
     private final SystemQueryProperties queryProperties;
     private final UserRoleRepository userRoleRepository;
     private final RoleMenuRepository roleMenuRepository;
+    private final MenuRepository menuRepository;
     private final AuthorizationCacheService authorizationCacheService;
     private final ObjectProvider<AuthUserCacheService> authUserCacheServiceProvider;
     private final TenantIdProvider tenantIdProvider;
@@ -106,20 +109,40 @@ public class RoleServiceImpl extends BaseServiceImpl<RolePageDTO, RolePageVO, Ro
     @Override
     public List<String> getRolePermissions(String id) {
         requireEntity(id);
-        return roleMenuRepository.findByRoleId(id).stream()
+        List<String> permissionIds = roleMenuRepository.findByRoleId(id).stream()
                 .map(RoleMenu::getMenuId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+        if (TenantMenuVisibility.isPlatformSuperAdmin()) return permissionIds;
+        Set<String> hidden = TenantMenuVisibility.hiddenIds(menuRepository.findByDeletedFalse());
+        return permissionIds.stream().filter(menuId -> !hidden.contains(menuId)).toList();
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean assignPermissions(String id, List<String> permissionIds) {
         requireEntity(id);
+        Set<String> hidden = TenantMenuVisibility.isPlatformSuperAdmin() ? Set.of()
+                : TenantMenuVisibility.hiddenIds(menuRepository.findByDeletedFalse());
+        List<String> preservedTenantMenuIds = TenantMenuVisibility.isPlatformSuperAdmin()
+                ? List.of()
+                : roleMenuRepository.findByRoleId(id).stream()
+                .map(RoleMenu::getMenuId)
+                .filter(Objects::nonNull)
+                .filter(hidden::contains)
+                .toList();
+        List<String> requestedPermissionIds = java.util.stream.Stream.concat(
+                        preservedTenantMenuIds.stream(), permissionIds == null ? java.util.stream.Stream.empty() : permissionIds.stream())
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (requestedPermissionIds.stream().anyMatch(menuId -> hidden.contains(menuId) && !preservedTenantMenuIds.contains(menuId))) {
+            throw new io.github.guanxiangkai.web.plus.error.exception.PermissionDeniedException("普通账号不能新增租户管理授权");
+        }
         roleMenuRepository.deleteByRoleId(id);
-
-        List<RoleMenu> roleMenus = permissionIds == null ? List.of() : permissionIds.stream()
+        List<RoleMenu> roleMenus = requestedPermissionIds.stream()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
                 .distinct()
@@ -146,7 +169,10 @@ public class RoleServiceImpl extends BaseServiceImpl<RolePageDTO, RolePageVO, Ro
         copy.setRemark(source.getRemark());
 
         Role saved = repository.save(copy);
+        Set<String> hidden = TenantMenuVisibility.isPlatformSuperAdmin() ? Set.of()
+                : TenantMenuVisibility.hiddenIds(menuRepository.findByDeletedFalse());
         List<RoleMenu> roleMenus = roleMenuRepository.findByRoleId(id).stream()
+                .filter(sourceRoleMenu -> sourceRoleMenu.getMenuId() != null && !hidden.contains(sourceRoleMenu.getMenuId()))
                 .map(sourceRoleMenu -> newRoleMenu(saved.getId(), sourceRoleMenu.getMenuId()))
                 .toList();
         roleMenuRepository.saveAll(roleMenus);

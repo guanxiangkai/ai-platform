@@ -22,6 +22,7 @@ import com.ai.system.repository.RoleMenuRepository;
 import com.ai.system.repository.UserRoleRepository;
 import com.ai.system.security.AuthUserCacheService;
 import com.ai.system.security.AuthorizationCacheService;
+import com.ai.system.security.TenantMenuVisibility;
 import com.ai.system.service.IMenuService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,12 +77,16 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String create(MenuCreateDTO dto) {
+        ensureMenuWriteAllowed(dto.parentId(), dto.path(), dto.component(), dto.permission());
         return super.create(dto);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void update(String id, MenuDTO dto) {
+        Menu existing = repository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id));
+        ensureMenuWriteAllowed(existing, dto.parentId(), dto.path(), dto.component(), dto.permission());
         Set<String> affectedUserIds = findUserIdsByMenu(id);
         super.update(id, dto);
         evictAuthorizationUsers(affectedUserIds);
@@ -91,6 +96,9 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(String id) {
+        Menu existing = repository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id));
+        ensureMenuWriteAllowed(existing, null, null, null, null);
         Set<String> affectedUserIds = findUserIdsByMenu(id);
         super.delete(id);
         evictAuthorizationUsers(affectedUserIds);
@@ -99,6 +107,7 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
 
     @Override
     protected Specification<Menu> buildQuerySpec(MenuPageDTO pageDTO) {
+        Set<String> hidden = hiddenTenantMenuIds();
         return SpecUtils.<Menu>builder()
                 .andIf(true, () -> (root, query, cb) -> cb.conjunction())
                 .eqIfPresent(Menu::getParentId, pageDTO != null ? pageDTO.getParentId() : null)
@@ -106,17 +115,20 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
                 .likeIfPresent(Menu::getMenuTitle, pageDTO != null ? pageDTO.getMenuTitle() : null)
                 .eqIfPresent(Menu::getMenuType, pageDTO != null ? pageDTO.getMenuType() : null)
                 .eqIfPresent(Menu::getVisible, pageDTO != null ? pageDTO.getVisible() : null)
+                .andIf(!hidden.isEmpty(), () -> (root, query, cb) -> cb.not(root.get("id").in(hidden)))
                 .build();
     }
 
     @Override
     public List<MenuVO> tree() {
-        return buildTree(loadMenuViews(repository.findByDeletedFalse()));
+        return buildTree(TenantMenuVisibility.filterTree(loadMenuViews(repository.findByDeletedFalse())));
     }
 
     @Override
     public List<MenuVO> getAssignableMenus() {
-        return loadMenuViews(repository.findByEnabledTrueAndDeletedFalse());
+        Set<String> hidden = hiddenTenantMenuIds();
+        return loadMenuViews(repository.findByEnabledTrueAndDeletedFalse().stream()
+                .filter(menu -> !hidden.contains(menu.getId())).toList());
     }
 
     @Override
@@ -221,6 +233,10 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
         if (ids == null || ids.isEmpty()) {
             return false;
         }
+        if (!TenantMenuVisibility.isPlatformSuperAdmin()) {
+            ids.stream().map(repository::findByIdAndDeletedFalse).flatMap(Optional::stream)
+                    .forEach(menu -> ensureMenuWriteAllowed(menu, null, null, null, null));
+        }
 
         try {
             // 根据传入的ID顺序更新菜单的sort字段
@@ -272,6 +288,8 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
         if (visible == null) {
             return false;
         }
+        ensureMenuWriteAllowed(repository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id)), null, null, null, null);
 
         try {
             Set<String> affectedUserIds = findUserIdsByMenu(id);
@@ -495,7 +513,11 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
 
     @Override
     public MenuVO detail(String id) {
+        if (hiddenTenantMenuIds().contains(id)) throw io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id);
         MenuVO menu = super.detail(id);
+        if (!TenantMenuVisibility.isPlatformSuperAdmin() && TenantMenuVisibility.isTenantNode(menu)) {
+            throw io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id);
+        }
         fillTypeLabel(menu);
         return menu;
     }
@@ -512,6 +534,50 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
             return;
         }
         menu.setTypeLabel(menu.getMenuType().label());
+    }
+
+    private void ensureMenuWriteAllowed(String parentId, String path, String component, String permission) {
+        if (TenantMenuVisibility.isPlatformSuperAdmin()) return;
+        if (isTenantDescriptor(path, component, permission)
+                || (StringUtils.hasText(parentId) && hiddenTenantMenuIds().contains(parentId))) {
+            throw new io.github.guanxiangkai.web.plus.error.exception.PermissionDeniedException("普通账号不能管理租户目录");
+        }
+    }
+
+    private void ensureMenuWriteAllowed(Menu existing, String parentId, String path, String component, String permission) {
+        if (TenantMenuVisibility.isPlatformSuperAdmin()) return;
+        if (TenantMenuVisibility.isTenantNode(existing) || hiddenTenantMenuIds().contains(existing.getId())) {
+            throw new io.github.guanxiangkai.web.plus.error.exception.PermissionDeniedException("普通账号不能管理租户目录");
+        }
+        ensureMenuWriteAllowed(parentId, path, component, permission);
+    }
+
+    /** 相同祖先闭包用于数据库分页、详情、选择器和写入，禁用的租户父目录也不能泄漏后代。 */
+    private Set<String> hiddenTenantMenuIds() {
+        return TenantMenuVisibility.isPlatformSuperAdmin() ? Set.of() : TenantMenuVisibility.hiddenIds(repository.findByDeletedFalse());
+    }
+
+    /** 通用基础服务的启用/批量启用入口也必须执行租户菜单边界。 */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateEnabled(String id, Boolean enabled) {
+        ensureMenuWriteAllowed(repository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> io.github.guanxiangkai.web.plus.core.exception.CoreBizException.notFound("菜单", id)), null, null, null, null);
+        super.updateEnabled(id, enabled);
+        evictAuthorizationUsers(findUserIdsByMenu(id));
+        refreshAuthUsers(findUserIdsByMenu(id));
+    }
+
+    private boolean isTenantDescriptor(String path, String component, String permission) {
+        return TenantMenuVisibility.isTenantNode(menuDescriptor(path, component, permission));
+    }
+
+    private MenuVO menuDescriptor(String path, String component, String permission) {
+        MenuVO menu = new MenuVO();
+        menu.setPath(path);
+        menu.setComponent(component);
+        menu.setPermission(permission);
+        return menu;
     }
 
     private void fillPageTypeLabel(PageResponse<MenuPageVO> pageResponse) {
