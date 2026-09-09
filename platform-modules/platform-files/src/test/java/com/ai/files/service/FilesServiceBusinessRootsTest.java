@@ -163,19 +163,14 @@ class FilesServiceBusinessRootsTest {
     void uploadToBusinessRootShouldCreateAndUseTheValidatedRelativeParent() {
         var root = service.ensureBusinessRoot("finance-project", "project-1", "项目甲");
         FilePart part = mock(FilePart.class);
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.TEXT_PLAIN);
         when(part.filename()).thenReturn("凭证.txt");
-        when(part.headers()).thenReturn(headers);
-        when(part.transferTo(any(java.nio.file.Path.class))).thenAnswer(invocation -> Mono.fromRunnable(() -> {
-            try {
-                java.nio.file.Files.writeString(invocation.getArgument(0), "x");
-            } catch (java.io.IOException exception) {
-                throw new java.io.UncheckedIOException(exception);
-            }
-        }));
-        when(uploadService.upload(any(), any())).thenReturn(new com.ai.api.files.dto.FileUploadResultDTO(
-                "file-1", "version-1", "凭证.txt", "object-1", "text/plain", 1L, "/files/file-1", "hash"));
+        service = org.mockito.Mockito.spy(service);
+        // 本用例验证根目录解析与委托；上传事务、对象失败恢复由 FileUploadServiceTest 单独验证。
+        org.mockito.Mockito.doReturn(Mono.just(new com.ai.api.files.dto.FileUploadResultDTO(
+                "file-1", "version-1", "凭证.txt", "object-1", "text/plain", 1L, "/files/file-1", "hash")))
+                .when(service).upload(org.mockito.ArgumentMatchers.eq("system-space"), org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.same(part), org.mockito.ArgumentMatchers.eq("invoice"),
+                        org.mockito.ArgumentMatchers.eq("invoice-1"), org.mockito.ArgumentMatchers.isNull());
 
         var uploaded = service.uploadToBusinessRoot(part, "finance-project", "project-1",
                 "原件/凭证/凭证.txt", "invoice", "invoice-1").block();
@@ -185,6 +180,7 @@ class FilesServiceBusinessRootsTest {
         assertThat(uploaded.relativePath()).isEqualTo("原件/凭证/凭证.txt");
         assertThat(uploaded.displayPath()).endsWith("/原件/凭证/凭证.txt");
         assertThat(uploaded.file().versionId()).isEqualTo("version-1");
+        org.mockito.Mockito.verify(service).upload("system-space", uploaded.parentId(), part, "invoice", "invoice-1", null);
     }
 
     private static String key(String businessType, String businessId) {
