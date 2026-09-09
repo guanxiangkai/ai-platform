@@ -11,6 +11,7 @@ import java.io.Serializable;
  */
 public record FileUploadResultDTO(
         String fileId,
+        String versionId,
         String originName,
         String storeName,
         String contentType,

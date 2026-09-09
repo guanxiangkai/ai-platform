@@ -3,6 +3,9 @@ package com.ai.api.files.config;
 import com.ai.api.context.TenantExecutionScope;
 import com.ai.api.files.client.FilesClient;
 import com.ai.api.files.dto.FileBusinessFileDTO;
+import com.ai.api.files.dto.FileBusinessRootDTO;
+import com.ai.api.files.dto.FileBusinessRootNodePageDTO;
+import com.ai.api.files.dto.FileBusinessUploadDTO;
 import com.ai.api.files.dto.FileUploadResultDTO;
 import io.github.guanxiangkai.web.plus.core.constants.AuthConstants;
 import io.github.guanxiangkai.web.plus.core.properties.TrustedForwardProperties;
@@ -46,7 +49,7 @@ class HttpFilesClientTest {
         FilesClient client = client(request -> {
             captured.set(request);
             return json(HttpStatus.OK, """
-                    {"code":200,"message":"ok","data":{"fileId":"file-1","originName":"a.txt",
+                    {"code":200,"message":"ok","data":{"fileId":"file-1","versionId":"version-1","originName":"a.txt",
                     "storeName":"stored","contentType":"text/plain","size":9223372036854775806,
                     "url":"/files/file-1","hash":"hash"},"timestamp":1}
                     """);
@@ -56,6 +59,7 @@ class HttpFilesClientTest {
                 "a.txt", "text/plain", "invoice", "order-1");
 
         assertThat(result.fileId()).isEqualTo("file-1");
+        assertThat(result.versionId()).isEqualTo("version-1");
         assertThat(result.size()).isEqualTo(9_223_372_036_854_775_806L);
         assertThat(captured.get().method().name()).isEqualTo("POST");
         assertThat(captured.get().url().getPath()).isEqualTo("/internal/files/upload");
@@ -79,6 +83,76 @@ class HttpFilesClientTest {
         FilesClient emptyClient = client(request -> json(HttpStatus.OK,
                 "{\"code\":200,\"message\":\"ok\",\"data\":[],\"timestamp\":1}"));
         assertThat(emptyClient.activeBusinessFiles("invoice", "order-1")).isEmpty();
+    }
+
+    @Test
+    void businessRootOperationsShouldUseBoundedRootEndpointsAndTypedDtos() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        FilesClient rootClient = client(request -> {
+            captured.set(request);
+            return json(HttpStatus.OK, """
+                    {"code":200,"message":"ok","data":{"rootId":"root-1","spaceId":"space-1",
+                    "displayPath":"/项目","displayName":"项目"},"timestamp":1}
+                    """);
+        });
+        FileBusinessRootDTO root = rootClient.ensureBusinessRoot("finance-project", "project-1", "项目");
+        assertThat(root.rootId()).isEqualTo("root-1");
+        assertThat(captured.get().url().getPath()).isEqualTo("/internal/files/business-roots/ensure");
+
+        FilesClient uploadClient = client(request -> json(HttpStatus.OK, """
+                {"code":200,"message":"ok","data":{"file":{"fileId":"file-1","versionId":"version-1",
+                "originName":"a.txt","storeName":"object","contentType":"text/plain","size":1,
+                "url":"/files/file-1","hash":"hash"},"rootId":"root-1","parentId":"folder-1",
+                "relativePath":"原件/合同","displayPath":"/项目/原件/合同/a.txt"},"timestamp":1}
+                """));
+        FileBusinessUploadDTO upload = uploadClient.uploadToBusinessRoot(new ByteArrayResource(new byte[]{1}),
+                "a.txt", "text/plain", "finance-project", "project-1", "原件/合同", "invoice", "invoice-1");
+        assertThat(upload.file().versionId()).isEqualTo("version-1");
+
+        AtomicReference<ClientRequest> nodesRequest = new AtomicReference<>();
+        FilesClient nodesClient = client(request -> {
+            nodesRequest.set(request);
+            return json(HttpStatus.OK, """
+                {"code":200,"message":"ok","data":{"records":[{"id":"folder-1","parentId":"root-1",
+                "name":"原件","displayPath":"/项目/原件","type":"FOLDER"}],"total":1,"page":1,"size":50,
+                "hasMore":false},"timestamp":1}
+                """);
+        });
+        FileBusinessRootNodePageDTO nodes = nodesClient.listBusinessRootNodes("finance-project", "project-1",
+                null, "FILE", 1, 50);
+        assertThat(nodes.records()).hasSize(1);
+        assertThat(nodes.hasMore()).isFalse();
+        assertThat(nodesRequest.get().url().getQuery()).contains("nodeType=FILE");
+    }
+
+    @Test
+    void fileMigrationOperationsShouldUseTypedMetadataAndPlaceEndpoints() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        FilesClient metadataClient = client(request -> {
+            captured.set(request);
+            return json(HttpStatus.OK, """
+                    {"code":200,"message":"ok","data":{"file":{"fileId":"file-1","versionId":"version-1",
+                    "originName":"a.pdf","storeName":"objects/a","contentType":"application/pdf","size":1,
+                    "url":"/files/file-1","hash":"hash"},"rootId":null,"parentId":"legacy-folder",
+                    "relativePath":null,"displayPath":"/旧目录/a.pdf"},"timestamp":1}
+                    """);
+        });
+        assertThat(metadataClient.fileMetadata("file-1", null).rootId()).isNull();
+        assertThat(captured.get().url().getPath()).isEqualTo("/internal/files/metadata");
+
+        FilesClient placeClient = client(request -> {
+            captured.set(request);
+            return json(HttpStatus.OK, """
+                    {"code":200,"message":"ok","data":{"file":{"fileId":"file-1","versionId":"version-1",
+                    "originName":"a.pdf","storeName":"objects/a","contentType":"application/pdf","size":1,
+                    "url":"/files/file-1","hash":"hash"},"rootId":"root-1","parentId":"folder-1",
+                    "relativePath":"原件/a.pdf","displayPath":"/项目/原件/a.pdf"},"timestamp":1}
+                    """);
+        });
+        assertThat(placeClient.placeBusinessFile("finance-project", "project-1", "file-1", "version-1",
+                "原件/a.pdf").relativePath()).isEqualTo("原件/a.pdf");
+        assertThat(captured.get().url().getPath()).isEqualTo("/internal/files/business-roots/place");
+        assertThat(captured.get().url().getQuery()).contains("expectedCurrentVersionId=version-1");
     }
 
     @Test
@@ -198,6 +272,17 @@ class HttpFilesClientTest {
         response.getBody().take(1).blockLast();
         assertThat(bodySubscriptions.get()).isEqualTo(1);
         assertThat(cancellations.get()).isEqualTo(1);
+    }
+
+    @Test
+    void downloadVersionShouldAddressTheExactVersionEndpoint() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        FilesClient client = client(request -> {
+            captured.set(request);
+            return Mono.just(ClientResponse.create(HttpStatus.OK).body(Flux.empty()).build());
+        });
+        client.downloadVersion("file-1", "version-1").block();
+        assertThat(captured.get().url().getPath()).isEqualTo("/internal/files/file-1/versions/version-1");
     }
 
     private static FilesClient client(ExchangeFunction exchangeFunction) {

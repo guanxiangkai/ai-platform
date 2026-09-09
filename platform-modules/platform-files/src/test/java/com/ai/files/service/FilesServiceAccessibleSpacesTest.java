@@ -6,6 +6,7 @@ import com.ai.files.domain.entity.FileSpace;
 import com.ai.files.repository.FileEditLockRepository;
 import com.ai.files.repository.FileGrantRepository;
 import com.ai.files.repository.FileNodeRepository;
+import com.ai.files.repository.FileBusinessRootRepository;
 import com.ai.files.repository.FileOperationLogRepository;
 import com.ai.files.repository.FileSpaceRepository;
 import com.ai.files.repository.FileVersionRepository;
@@ -48,6 +49,7 @@ class FilesServiceAccessibleSpacesTest {
         service = new FilesService(
                 spaces,
                 mock(FileNodeRepository.class),
+                mock(FileBusinessRootRepository.class),
                 mock(FileVersionRepository.class),
                 mock(FileGrantRepository.class),
                 mock(FileEditLockRepository.class),

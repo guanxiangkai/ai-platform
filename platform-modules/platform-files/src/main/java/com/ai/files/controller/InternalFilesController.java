@@ -3,6 +3,9 @@ package com.ai.files.controller;
 import io.github.guanxiangkai.web.plus.core.model.ApiResponse;
 import com.ai.api.files.dto.FileUploadResultDTO;
 import com.ai.api.files.dto.FileBusinessFileDTO;
+import com.ai.api.files.dto.FileBusinessRootDTO;
+import com.ai.api.files.dto.FileBusinessRootNodePageDTO;
+import com.ai.api.files.dto.FileBusinessUploadDTO;
 import com.ai.files.service.FilesService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
@@ -43,10 +46,70 @@ public class InternalFilesController {
                 .map(ApiResponse::ok);
     }
 
+    /** 幂等确保当前租户业务记录的稳定根目录。 */
+    @PostMapping("/business-roots/ensure")
+    public ApiResponse<FileBusinessRootDTO> ensureBusinessRoot(@RequestParam String businessType,
+                                                               @RequestParam String businessId,
+                                                               @RequestParam String displayName) {
+        return ApiResponse.ok(filesService.ensureBusinessRoot(businessType, businessId, displayName));
+    }
+
+    /** 上传文件到当前租户业务根目录的相对路径。 */
+    @PostMapping(value = "/business-roots/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Mono<ApiResponse<FileBusinessUploadDTO>> uploadToBusinessRoot(
+            @RequestPart("file") Mono<FilePart> filePart,
+            @RequestParam String rootBusinessType,
+            @RequestParam String rootBusinessId,
+            @RequestParam(required = false) String relativePath,
+            @RequestParam(required = false) String bizType,
+            @RequestParam(required = false) String bizId) {
+        return filePart.flatMap(file -> filesService.uploadToBusinessRoot(file, rootBusinessType,
+                        rootBusinessId, relativePath, bizType, bizId))
+                .map(ApiResponse::ok);
+    }
+
+    /** 分页读取业务根目录或其子目录的直属节点。 */
+    @GetMapping("/business-roots/nodes")
+    public ApiResponse<FileBusinessRootNodePageDTO> businessRootNodes(
+            @RequestParam String businessType,
+            @RequestParam String businessId,
+            @RequestParam(required = false) String parentId,
+            @RequestParam(required = false) String nodeType,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ApiResponse.ok(filesService.businessRootNodes(businessType, businessId, parentId, nodeType, page, size));
+    }
+
+    /** 查询文件指定版本或当前版本的真实元数据和业务根目录位置。 */
+    @GetMapping("/metadata")
+    public ApiResponse<FileBusinessUploadDTO> fileMetadata(@RequestParam String fileId,
+                                                           @RequestParam(required = false) String versionId) {
+        return ApiResponse.ok(filesService.fileMetadata(fileId, versionId));
+    }
+
+    /** 在不重传对象和不改写版本的前提下将既有文件节点迁入业务根目录。 */
+    @PostMapping("/business-roots/place")
+    public ApiResponse<FileBusinessUploadDTO> placeBusinessFile(
+            @RequestParam String rootBusinessType,
+            @RequestParam String rootBusinessId,
+            @RequestParam String fileId,
+            @RequestParam String expectedCurrentVersionId,
+            @RequestParam String relativePath) {
+        return ApiResponse.ok(filesService.placeBusinessFile(rootBusinessType, rootBusinessId, fileId,
+                expectedCurrentVersionId, relativePath));
+    }
+
     /** 下载当前租户的内部业务附件。 */
     @GetMapping("/{nodeId}")
     public Mono<ResponseEntity<Resource>> download(@PathVariable String nodeId) {
         return filesService.internalDownload(nodeId);
+    }
+
+    /** 下载可信内部服务指定的文件历史版本。 */
+    @GetMapping("/{nodeId}/versions/{versionId}")
+    public Mono<ResponseEntity<Resource>> downloadVersion(@PathVariable String nodeId,
+                                                           @PathVariable String versionId) {
+        return filesService.internalDownloadVersion(nodeId, versionId);
     }
 
     /** 查询当前租户业务记录关联的活动附件。 */

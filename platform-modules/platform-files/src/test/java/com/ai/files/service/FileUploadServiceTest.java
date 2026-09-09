@@ -31,7 +31,7 @@ class FileUploadServiceTest {
         var command = command();
         var reservation = reservation();
         var result = new FileUploadResultDTO(
-                "node-1", "report.txt", "object-key", "text/plain", 128L,
+                "node-1", "version-1", "report.txt", "object-key", "text/plain", 128L,
                 "/files/node-1", "hash");
         when(transactions.reserve(command)).thenReturn(reservation);
         when(transactions.complete(reservation)).thenReturn(result);

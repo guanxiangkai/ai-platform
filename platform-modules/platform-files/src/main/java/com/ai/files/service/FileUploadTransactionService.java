@@ -361,7 +361,7 @@ class FileUploadTransactionService {
 
     private FileUploadResultDTO result(FileUploadRecord upload, FileVersion version) {
         return new FileUploadResultDTO(
-                upload.getNodeId(), version.getOriginalName(), upload.getObjectKey(),
+                upload.getNodeId(), version.getId(), version.getOriginalName(), upload.getObjectKey(),
                 version.getContentType(), version.getSizeBytes(),
                 "/files/" + upload.getNodeId(), version.getSha256());
     }

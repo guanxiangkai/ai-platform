@@ -32,4 +32,8 @@ public interface FileVersionRepository extends JpaRepository<FileVersion, String
 
     /** 按租户边界查询未删除版本。 */
     Optional<FileVersion> findByIdAndTenantIdAndDeletedFalse(String id, String tenantId);
+
+    /** 查询当前租户指定节点的可下载版本。 */
+    Optional<FileVersion> findByIdAndNodeIdAndTenantIdAndVersionStateAndDeletedFalse(
+            String id, String nodeId, String tenantId, FileVersionState versionState);
 }

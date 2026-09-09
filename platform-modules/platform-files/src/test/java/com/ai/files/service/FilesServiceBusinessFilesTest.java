@@ -9,6 +9,7 @@ import com.ai.files.domain.entity.FileOperationLog;
 import com.ai.files.repository.FileEditLockRepository;
 import com.ai.files.repository.FileGrantRepository;
 import com.ai.files.repository.FileNodeRepository;
+import com.ai.files.repository.FileBusinessRootRepository;
 import com.ai.files.repository.FileOperationLogRepository;
 import com.ai.files.repository.FileSpaceRepository;
 import com.ai.files.repository.FileVersionRepository;
@@ -51,7 +52,7 @@ class FilesServiceBusinessFilesTest {
             return null;
         }).when(transactions).executeWithoutResult(any());
         service = new FilesService(
-                mock(FileSpaceRepository.class), nodes, mock(FileVersionRepository.class),
+                mock(FileSpaceRepository.class), nodes, mock(FileBusinessRootRepository.class), mock(FileVersionRepository.class),
                 mock(FileGrantRepository.class), mock(FileEditLockRepository.class), operationLogs,
                 access, mock(FileObjectStorage.class), mock(FileUploadService.class), mock(FilesProperties.class),
                 transactions);
@@ -103,7 +104,7 @@ class FilesServiceBusinessFilesTest {
         when(access.isInternalService()).thenReturn(false);
         TransactionTemplate transactions = mock(TransactionTemplate.class);
         FilesService denied = new FilesService(
-                mock(FileSpaceRepository.class), nodes, mock(FileVersionRepository.class),
+                mock(FileSpaceRepository.class), nodes, mock(FileBusinessRootRepository.class), mock(FileVersionRepository.class),
                 mock(FileGrantRepository.class), mock(FileEditLockRepository.class), operationLogs,
                 access, mock(FileObjectStorage.class), mock(FileUploadService.class), mock(FilesProperties.class),
                 transactions);
