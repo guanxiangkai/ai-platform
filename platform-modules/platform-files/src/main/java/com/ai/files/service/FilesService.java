@@ -712,6 +712,10 @@ public class FilesService {
             if (!space.getId().equals(node.getSpaceId())) {
                 throw new BizException("文件不在当前租户系统空间");
             }
+            FileBusinessRoot existingRoot = businessRootForNode(node);
+            if (existingRoot != null && !root.getId().equals(existingRoot.getRootNodeId())) {
+                throw new BizException("文件已归属其他业务根目录，不能迁入当前业务根目录");
+            }
             if (!expectedVersion.equals(node.getCurrentVersionId())) {
                 throw new BizException("文件当前版本已变更");
             }

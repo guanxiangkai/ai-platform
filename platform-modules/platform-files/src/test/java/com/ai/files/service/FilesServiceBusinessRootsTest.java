@@ -91,6 +91,13 @@ class FilesServiceBusinessRootsTest {
         });
         when(nodeRepository.findByIdAndDeletedFalse(any())).thenAnswer(invocation ->
                 Optional.ofNullable(nodesById.get(invocation.getArgument(0))));
+        when(nodeRepository.findBySpaceIdAndParentIdAndNodeNameAndNodeStateAndDeletedFalse(any(), any(), any(), any()))
+                .thenAnswer(invocation -> nodesById.values().stream()
+                        .filter(node -> java.util.Objects.equals(node.getSpaceId(), invocation.getArgument(0))
+                                && java.util.Objects.equals(node.getParentId(), invocation.getArgument(1))
+                                && java.util.Objects.equals(node.getNodeName(), invocation.getArgument(2))
+                                && node.getNodeState() == invocation.getArgument(3))
+                        .findFirst());
 
         FileAccessService access = mock(FileAccessService.class);
         when(access.isInternalService()).thenReturn(true);
@@ -218,6 +225,8 @@ class FilesServiceBusinessRootsTest {
         assertThat(placed.file().storeName()).isEqualTo("objects/original");
         assertThat(placed.file().hash()).isEqualTo("hash-1");
         assertThat(service.fileMetadata("file-1", null)).isEqualTo(placed);
+        assertThat(service.placeBusinessFile("finance-project", "project-1", "file-1", "version-1",
+                "原件/合同/原件.pdf")).isEqualTo(placed);
         FileVersion historical = new FileVersion();
         historical.setId("version-old"); historical.setTenantId("tenant-a"); historical.setNodeId("file-1");
         historical.setVersionNo(0); historical.setVersionState(FileVersionState.AVAILABLE);
@@ -245,6 +254,45 @@ class FilesServiceBusinessRootsTest {
         file.setTenantId("tenant-a");
         assertThatThrownBy(() -> service.placeBusinessFile("finance-project", "project-1", "file-1", "version-1",
                         "原件/已改名.pdf")).hasMessage("相对路径的文件名与当前文件名不一致");
+    }
+
+    @Test
+    void placeBusinessFileShouldRejectMovingFromAnotherBusinessRootWithoutChangingFileOrVersion() {
+        var sourceRoot = service.ensureBusinessRoot("finance-project", "project-a", "项目甲");
+        var targetRoot = service.ensureBusinessRoot("finance-project", "project-b", "项目乙");
+        FileNode sourceFolder = new FileNode();
+        sourceFolder.setId("source-folder"); sourceFolder.setTenantId("tenant-a"); sourceFolder.setSpaceId("system-space");
+        sourceFolder.setParentId(sourceRoot.rootId()); sourceFolder.setNodeType(FileNodeType.FOLDER);
+        sourceFolder.setNodeState(FileNodeState.ACTIVE); sourceFolder.setNodeName("原件");
+        sourceFolder.setDisplayPath(sourceRoot.displayPath() + "/原件");
+        nodesById.put(sourceFolder.getId(), sourceFolder);
+        FileNode file = new FileNode();
+        file.setId("file-1"); file.setTenantId("tenant-a"); file.setSpaceId("system-space");
+        file.setParentId(sourceFolder.getId()); file.setNodeType(FileNodeType.FILE); file.setNodeState(FileNodeState.ACTIVE);
+        file.setNodeName("原件.pdf"); file.setDisplayPath(sourceFolder.getDisplayPath() + "/原件.pdf");
+        file.setCurrentVersionId("version-1"); nodesById.put(file.getId(), file);
+        when(nodeRepository.findLockedByIdAndTenantId("file-1", "tenant-a")).thenReturn(Optional.of(file));
+        FileVersion version = new FileVersion();
+        version.setId("version-1"); version.setNodeId("file-1"); version.setTenantId("tenant-a");
+        version.setObjectKey("objects/original"); version.setSha256("hash-1");
+        String originalParentId = file.getParentId();
+        String originalPath = file.getDisplayPath();
+        String originalVersionId = file.getCurrentVersionId();
+        String originalObjectKey = version.getObjectKey();
+        String originalHash = version.getSha256();
+
+        assertThatThrownBy(() -> service.placeBusinessFile("finance-project", "project-b", "file-1", "version-1",
+                        "原件/原件.pdf"))
+                .hasMessage("文件已归属其他业务根目录，不能迁入当前业务根目录");
+
+        assertThat(file.getParentId()).isEqualTo(originalParentId);
+        assertThat(file.getDisplayPath()).isEqualTo(originalPath);
+        assertThat(file.getCurrentVersionId()).isEqualTo(originalVersionId);
+        assertThat(version.getObjectKey()).isEqualTo(originalObjectKey);
+        assertThat(version.getSha256()).isEqualTo(originalHash);
+        org.mockito.Mockito.verifyNoInteractions(uploadService);
+        org.mockito.Mockito.verifyNoInteractions(versions);
+        assertThat(targetRoot.rootId()).isNotEqualTo(sourceRoot.rootId());
     }
 
     @Test
