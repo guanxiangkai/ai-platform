@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 /**
  * 文件节点持久化接口。
@@ -29,6 +31,10 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
     /** 查询目录下的节点。 */
     List<FileNode> findBySpaceIdAndParentIdAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
             String spaceId, String parentId, FileNodeState state);
+
+    /** 分页查询目录中的活动节点。 */
+    Page<FileNode> findBySpaceIdAndParentIdAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
+            String spaceId, String parentId, FileNodeState state, Pageable pageable);
 
     /** 查询同目录同名活动节点。 */
     Optional<FileNode> findBySpaceIdAndParentIdAndNodeNameAndNodeStateAndDeletedFalse(

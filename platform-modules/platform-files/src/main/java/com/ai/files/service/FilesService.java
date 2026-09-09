@@ -4,6 +4,10 @@ import io.github.guanxiangkai.web.plus.error.exception.BizException;
 import io.github.guanxiangkai.web.plus.security.util.SecurityUtils;
 import com.ai.api.files.dto.FileAccessUrlDTO;
 import com.ai.api.files.dto.FileBusinessFileDTO;
+import com.ai.api.files.dto.FileBusinessRootDTO;
+import com.ai.api.files.dto.FileBusinessRootNodeDTO;
+import com.ai.api.files.dto.FileBusinessRootNodePageDTO;
+import com.ai.api.files.dto.FileBusinessUploadDTO;
 import com.ai.api.files.dto.FileUploadResultDTO;
 import com.ai.files.config.FilesProperties;
 import com.ai.files.domain.FileNodeState;
@@ -16,6 +20,7 @@ import com.ai.files.domain.FileSpaceType;
 import com.ai.files.domain.FileVersionState;
 import com.ai.files.domain.dto.FileRequests;
 import com.ai.files.domain.entity.FileEditLock;
+import com.ai.files.domain.entity.FileBusinessRoot;
 import com.ai.files.domain.entity.FileGrant;
 import com.ai.files.domain.entity.FileNode;
 import com.ai.files.domain.entity.FileOperationLog;
@@ -23,6 +28,7 @@ import com.ai.files.domain.entity.FileSpace;
 import com.ai.files.domain.entity.FileVersion;
 import com.ai.files.domain.vo.FileViews;
 import com.ai.files.repository.FileEditLockRepository;
+import com.ai.files.repository.FileBusinessRootRepository;
 import com.ai.files.repository.FileGrantRepository;
 import com.ai.files.repository.FileNodeRepository;
 import com.ai.files.repository.FileOperationLogRepository;
@@ -34,6 +40,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
@@ -67,6 +76,7 @@ public class FilesService {
 
     private final FileSpaceRepository spaceRepository;
     private final FileNodeRepository nodeRepository;
+    private final FileBusinessRootRepository businessRootRepository;
     private final FileVersionRepository versionRepository;
     private final FileGrantRepository grantRepository;
     private final FileEditLockRepository lockRepository;
@@ -327,6 +337,9 @@ public class FilesService {
     public FileNode rename(String nodeId, FileRequests.RenameNode request) {
         return Objects.requireNonNull(transactionTemplate.execute(status -> {
             FileNode node = requireActiveNode(nodeId);
+            if (businessRootRepository.existsByRootNodeIdAndDeletedFalse(node.getId())) {
+                throw new BizException("业务根目录只能由业务根目录接口重命名");
+            }
             FileSpace space = requireSpace(node.getSpaceId());
             accessService.require(space, node, FileRole.EDITOR);
             String newName = safeName(request.nodeName());
@@ -352,6 +365,9 @@ public class FilesService {
     public FileNode move(String nodeId, FileRequests.MoveNode request) {
         return Objects.requireNonNull(transactionTemplate.execute(status -> {
             FileNode node = requireActiveNode(nodeId);
+            if (businessRootRepository.existsByRootNodeIdAndDeletedFalse(node.getId())) {
+                throw new BizException("业务根目录不能移动");
+            }
             FileSpace space = requireSpace(node.getSpaceId());
             FileNode target = resolveParent(space, request.parentId());
             accessService.require(space, node, FileRole.EDITOR);
@@ -379,6 +395,9 @@ public class FilesService {
     public void trash(String nodeId) {
         transactionTemplate.executeWithoutResult(status -> {
             FileNode node = requireActiveNode(nodeId);
+            if (businessRootRepository.existsByRootNodeIdAndDeletedFalse(node.getId())) {
+                throw new BizException("业务根目录不能移入回收站");
+            }
             FileSpace space = requireSpace(node.getSpaceId());
             accessService.require(space, node, FileRole.EDITOR);
             Instant now = Instant.now();
@@ -574,6 +593,84 @@ public class FilesService {
         return upload(systemSpace.getId(), businessFolder.getId(), filePart, businessType, businessId, null);
     }
 
+    /** 确保当前租户业务记录拥有唯一、稳定的系统空间根目录。 */
+    public FileBusinessRootDTO ensureBusinessRoot(String businessType, String businessId, String displayName) {
+        requireInternalService();
+        String type = businessScope(businessType, 64, "业务类型无效");
+        String id = businessScope(businessId, 128, "业务标识无效");
+        String name = safeBusinessRootName(displayName);
+        FileSpace systemSpace = systemSpace();
+        return Objects.requireNonNull(transactionTemplate.execute(status -> {
+            FileSpace lockedSpace = spaceRepository.findLockedByIdAndTenantId(systemSpace.getId(), requireTenantId())
+                    .orElseThrow(() -> new BizException("系统文件空间不存在"));
+            FileBusinessRoot binding = businessRootRepository
+                    .findByTenantIdAndBusinessTypeAndBusinessIdAndDeletedFalse(requireTenantId(), type, id)
+                    .orElse(null);
+            if (binding != null) {
+                FileNode root = requireBusinessRootNode(binding, lockedSpace);
+                String expectedName = businessRootName(name, type, id);
+                if (!expectedName.equals(root.getNodeName())) {
+                    renameBusinessRoot(root, expectedName);
+                }
+                return businessRootView(root, lockedSpace);
+            }
+            FileNode root = nodeRepository.save(newNode(lockedSpace, null,
+                    businessRootName(name, type, id), FileNodeType.FOLDER));
+            FileBusinessRoot created = new FileBusinessRoot();
+            created.setId(id());
+            created.setTenantId(requireTenantId());
+            created.setStatus(FileRecordStatus.ACTIVE.name());
+            created.setBusinessType(type);
+            created.setBusinessId(id);
+            created.setRootNodeId(root.getId());
+            businessRootRepository.save(created);
+            audit(FileOperationType.CREATE_FOLDER, lockedSpace.getId(), root.getId(), "业务根目录");
+            return businessRootView(root, lockedSpace);
+        }));
+    }
+
+    /** 上传文件到业务根目录内的相对路径，目录由服务端创建并校验。 */
+    public Mono<FileBusinessUploadDTO> uploadToBusinessRoot(FilePart filePart, String rootBusinessType,
+                                                             String rootBusinessId, String relativePath,
+                                                             String businessType, String businessId) {
+        requireInternalService();
+        String type = businessScope(rootBusinessType, 64, "根业务类型无效");
+        String id = businessScope(rootBusinessId, 128, "根业务标识无效");
+        String path = normalizeRelativePath(relativePath);
+        if (filePart == null) throw new BizException("上传文件不能为空");
+        String filename = safeName(filePart.filename());
+        if (path.isEmpty()) path = filename;
+        int lastSeparator = path.lastIndexOf('/');
+        if (!filename.equals(path.substring(lastSeparator + 1))) throw new BizException("相对路径的文件名与上传原件不一致");
+        String directory = lastSeparator < 0 ? "" : path.substring(0, lastSeparator);
+        String filePath = path;
+        FileBusinessRootDTO root = businessRootForUpload(type, id);
+        FileNode parent = resolveBusinessUploadParent(type, id, root.spaceId(), root.rootId(), directory);
+        return upload(root.spaceId(), parent.getId(), filePart, businessType, businessId, null)
+                .map(file -> new FileBusinessUploadDTO(file, root.rootId(), parent.getId(), filePath,
+                        parent.getDisplayPath() + "/" + file.originName()));
+    }
+
+    /** 分页读取业务根目录或其子目录的直属活动节点。 */
+    public FileBusinessRootNodePageDTO businessRootNodes(String businessType, String businessId,
+                                                          String parentId, int page, int size) {
+        requireInternalService();
+        int safePage = Math.max(1, page);
+        int safeSize = Math.min(200, Math.max(1, size));
+        FileBusinessRoot binding = requireBusinessRoot(businessType, businessId);
+        FileSpace space = systemSpace();
+        FileNode root = requireBusinessRootNode(binding, space);
+        FileNode parent = resolveBusinessRootParent(space, root, parentId);
+        Page<FileNode> result = nodeRepository.findBySpaceIdAndParentIdAndNodeStateAndDeletedFalseOrderByNodeNameAsc(
+                space.getId(), parent.getId(), FileNodeState.ACTIVE, PageRequest.of(safePage - 1, safeSize));
+        List<FileBusinessRootNodeDTO> records = result.getContent().stream()
+                .map(node -> new FileBusinessRootNodeDTO(node.getId(), node.getParentId(), node.getNodeName(),
+                        node.getDisplayPath(), node.getNodeType().name()))
+                .toList();
+        return new FileBusinessRootNodePageDTO(records, result.getTotalElements(), safePage, safeSize,
+                result.hasNext());
+    }
+
     /**
      * 下载可信内部服务的业务附件。
      *
@@ -585,6 +682,17 @@ public class FilesService {
             return Mono.error(new BizException("仅可信内部服务可以调用该接口"));
         }
         return download(nodeId);
+    }
+
+    /** 下载当前租户指定节点的指定可用版本。 */
+    public Mono<ResponseEntity<Resource>> internalDownloadVersion(String nodeId, String versionId) {
+        if (!accessService.isInternalService()) {
+            return Mono.error(new BizException("仅可信内部服务可以调用该接口"));
+        }
+        FileContext context = readableVersion(nodeId, versionId);
+        auditInTransaction(FileOperationType.DOWNLOAD, context.space().getId(), context.node().getId(),
+                "version=" + context.version().getVersionNo());
+        return Mono.fromCallable(() -> objectStorage.download(context.version())).subscribeOn(Schedulers.boundedElastic());
     }
 
     /**
@@ -676,14 +784,162 @@ public class FilesService {
         return new FileContext(space, node, version);
     }
 
+    private FileContext readableVersion(String nodeId, String versionId) {
+        FileNode node = requireActiveNode(nodeId);
+        if (!requireTenantId().equals(node.getTenantId())) {
+            throw new BizException("文件节点不属于当前租户");
+        }
+        if (node.getNodeType() != FileNodeType.FILE) {
+            throw new BizException("目标节点不是文件");
+        }
+        FileSpace space = requireSpace(node.getSpaceId());
+        accessService.require(space, node, FileRole.VIEWER);
+        FileVersion version = versionRepository.findByIdAndNodeIdAndTenantIdAndVersionStateAndDeletedFalse(
+                        requireText(versionId, "文件版本标识不能为空"), node.getId(), requireTenantId(),
+                        FileVersionState.AVAILABLE)
+                .orElseThrow(() -> new BizException("文件版本不存在"));
+        return new FileContext(space, node, version);
+    }
+
+    private FileBusinessRoot requireBusinessRoot(String businessType, String businessId) {
+        return businessRootRepository.findByTenantIdAndBusinessTypeAndBusinessIdAndDeletedFalse(
+                        requireTenantId(), businessScope(businessType, 64, "业务类型无效"),
+                        businessScope(businessId, 128, "业务标识无效"))
+                .orElseThrow(() -> new BizException("业务根目录不存在"));
+    }
+
+    private FileNode requireBusinessRootNode(FileBusinessRoot binding, FileSpace space) {
+        FileNode root = requireActiveNode(binding.getRootNodeId());
+        if (!space.getId().equals(root.getSpaceId()) || StringUtils.hasText(root.getParentId())
+                || root.getNodeType() != FileNodeType.FOLDER
+                || !requireTenantId().equals(root.getTenantId())) {
+            throw new BizException("业务根目录绑定无效");
+        }
+        return root;
+    }
+
+    private FileBusinessRootDTO businessRootView(FileNode root, FileSpace space) {
+        return new FileBusinessRootDTO(root.getId(), space.getId(), root.getDisplayPath(), root.getNodeName());
+    }
+
+    private FileBusinessRootDTO businessRootForUpload(String businessType, String businessId) {
+        FileBusinessRoot binding = businessRootRepository
+                .findByTenantIdAndBusinessTypeAndBusinessIdAndDeletedFalse(requireTenantId(), businessType, businessId)
+                .orElse(null);
+        if (binding == null) {
+            return ensureBusinessRoot(businessType, businessId, businessType + "-" + businessId);
+        }
+        FileSpace space = systemSpace();
+        return businessRootView(requireBusinessRootNode(binding, space), space);
+    }
+
+    private FileNode resolveBusinessUploadParent(String businessType, String businessId, String spaceId,
+                                                  String rootId, String relativePath) {
+        return Objects.requireNonNull(transactionTemplate.execute(status -> {
+            FileSpace space = spaceRepository.findLockedByIdAndTenantId(spaceId, requireTenantId())
+                    .orElseThrow(() -> new BizException("系统文件空间不存在"));
+            FileNode parent = requireBusinessRootNode(requireBusinessRoot(businessType, businessId), space);
+            if (!rootId.equals(parent.getId())) {
+                throw new BizException("业务根目录绑定已变更");
+            }
+            for (String segment : relativePath.isEmpty() ? List.<String>of() : List.of(relativePath.split("/"))) {
+                FileNode current = parent;
+                parent = nodeRepository.findBySpaceIdAndParentIdAndNodeNameAndNodeStateAndDeletedFalse(
+                                space.getId(), current.getId(), segment, FileNodeState.ACTIVE)
+                        .map(node -> {
+                            if (node.getNodeType() != FileNodeType.FOLDER) {
+                                throw new BizException("业务目录名称冲突");
+                            }
+                            return node;
+                        })
+                        .orElseGet(() -> nodeRepository.save(newNode(space, current, segment, FileNodeType.FOLDER)));
+            }
+            return parent;
+        }));
+    }
+
+    private FileNode resolveBusinessRootParent(FileSpace space, FileNode root, String parentId) {
+        if (!StringUtils.hasText(parentId)) {
+            return root;
+        }
+        FileNode parent = requireActiveNode(parentId);
+        if (!space.getId().equals(parent.getSpaceId()) || parent.getNodeType() != FileNodeType.FOLDER
+                || (!parent.getId().equals(root.getId())
+                && !parent.getDisplayPath().startsWith(root.getDisplayPath() + "/"))) {
+            throw new BizException("父目录不属于业务根目录");
+        }
+        return parent;
+    }
+
+    private void renameBusinessRoot(FileNode root, String name) {
+        ensureNameAvailable(root.getSpaceId(), root.getParentId(), name, root.getId());
+        String oldPath = root.getDisplayPath();
+        root.setNodeName(name);
+        root.setDisplayPath("/" + name);
+        updateDescendantPaths(root, oldPath);
+        nodeRepository.save(root);
+        audit(FileOperationType.RENAME, root.getSpaceId(), root.getId(), oldPath + " -> " + root.getDisplayPath());
+    }
+
+    private String businessRootName(String displayName, String businessType, String businessId) {
+        String suffix = "-" + FileChecksum.sha256(businessType.length() + ":" + businessType + businessId).substring(0, 24);
+        return displayName.substring(0, Math.min(displayName.length(), 256 - suffix.length())) + suffix;
+    }
+
+    private String normalizeRelativePath(String rawPath) {
+        if (!StringUtils.hasText(rawPath)) {
+            return "";
+        }
+        String value = rawPath.trim().replace('\\', '/');
+        if (value.startsWith("/") || value.matches("^[A-Za-z]:.*") || value.indexOf('\0') >= 0 || value.length() > 1_024) {
+            throw new BizException("业务相对路径非法");
+        }
+        String[] segments = value.split("/", -1);
+        if (segments.length > 16) {
+            throw new BizException("业务相对路径层级过深");
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String segment : segments) {
+            String name = segment.trim();
+            if (!StringUtils.hasText(name) || ".".equals(name) || "..".equals(name) || name.length() > 128
+                    || name.chars().anyMatch(Character::isISOControl)) {
+                throw new BizException("业务相对路径非法");
+            }
+            normalized.add(name);
+        }
+        return String.join("/", normalized);
+    }
+
+    private String safeBusinessRootName(String displayName) {
+        String name = safeName(displayName);
+        if (name.chars().anyMatch(Character::isISOControl)) {
+            throw new BizException("业务根目录名称非法");
+        }
+        return name;
+    }
+
     private FileSpace systemSpace() {
         if (!accessService.isInternalService()) {
             throw new BizException("仅可信内部服务可以访问系统文件空间");
         }
-        return Objects.requireNonNull(transactionTemplate.execute(status -> spaceRepository
-                .findBySpaceCodeAndDeletedFalse("system")
-                .orElseGet(() -> createSpace("system", "业务附件", FileSpaceType.SYSTEM,
-                        null, null, properties.systemQuotaBytes()))));
+        String tenantId = requireTenantId();
+        try {
+            return Objects.requireNonNull(transactionTemplate.execute(status -> spaceRepository
+                    .findByTenantIdAndSpaceCodeAndDeletedFalse(tenantId, "system")
+                    .orElseGet(() -> createSpace("system", "业务附件", FileSpaceType.SYSTEM,
+                            null, null, properties.systemQuotaBytes()))));
+        } catch (DataIntegrityViolationException conflict) {
+            // 唯一约束使并发首建只有一个获胜者；失败事务已回滚，必须在新事务重查。
+            return Objects.requireNonNull(transactionTemplate.execute(status -> spaceRepository
+                    .findByTenantIdAndSpaceCodeAndDeletedFalse(tenantId, "system")
+                    .orElseThrow(() -> conflict)));
+        }
+    }
+
+    private static String businessScope(String value, int maxLength, String message) {
+        if (!StringUtils.hasText(value) || value.trim().length() > maxLength
+                || value.chars().anyMatch(Character::isISOControl)) throw new BizException(message);
+        return value.trim();
     }
 
     private FileNode systemBusinessFolder(FileSpace space, String businessType, String businessId) {
@@ -713,6 +969,7 @@ public class FilesService {
                                   String ownerUserId, String ownerDeptId, long quotaBytes) {
         FileSpace space = new FileSpace();
         space.setId(id());
+        space.setTenantId(requireTenantId());
         space.setSpaceCode(code);
         space.setSpaceName(name);
         space.setSpaceType(type);
@@ -729,6 +986,7 @@ public class FilesService {
     private FileNode newNode(FileSpace space, FileNode parent, String name, FileNodeType type) {
         FileNode node = new FileNode();
         node.setId(id());
+        node.setTenantId(requireTenantId());
         node.setSpaceId(space.getId());
         node.setParentId(parentId(parent));
         node.setNodeType(type);

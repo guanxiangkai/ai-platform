@@ -39,7 +39,8 @@ class FileUploadPostgresConcurrencyTest {
                         owner_user_id varchar(64),
                         quota_bytes bigint NOT NULL,
                         used_bytes bigint NOT NULL,
-                        reserved_bytes bigint NOT NULL
+                        reserved_bytes bigint NOT NULL,
+                        CONSTRAINT uk_file_space_tenant_code UNIQUE (tenant_id, space_code)
                     )
                     """);
             execute(connection, """
@@ -133,6 +134,49 @@ class FileUploadPostgresConcurrencyTest {
                         '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
                     )
                     """);
+        }
+    }
+
+    @Test
+    void firstSystemSpaceCreationShouldBeUniqueWithinEachTenant() throws Exception {
+        CountDownLatch ready = new CountDownLatch(2);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> insertTenantSystemSpace("root-tenant-a", "root-space-a1", ready));
+            var second = executor.submit(() -> insertTenantSystemSpace("root-tenant-a", "root-space-a2", ready));
+            assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(second.get(10, TimeUnit.SECONDS));
+        }
+        String other = insertTenantSystemSpace("root-tenant-b", "root-space-b", new CountDownLatch(0));
+        assertThat(other).isEqualTo("root-space-b");
+        try (Connection connection = connection(); var statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT count(*) FROM file_space WHERE space_code='system'")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getInt(1)).isEqualTo(2);
+        }
+    }
+
+    /** 独立验证部署所需数据库唯一边界；服务冲突后重查由业务服务测试覆盖。 */
+    private static String insertTenantSystemSpace(String tenant, String candidate, CountDownLatch ready) throws Exception {
+        try (Connection connection = connection()) {
+            connection.setAutoCommit(false);
+            ready.countDown();
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            try (var statement = connection.prepareStatement("""
+                    INSERT INTO file_space(id,deleted,version,tenant_id,enabled,space_code,space_name,space_type,quota_bytes,used_bytes,reserved_bytes)
+                    VALUES (?,false,0,?,true,'system','Business files','SYSTEM',100,0,0)
+                    """)) {
+                statement.setString(1, candidate); statement.setString(2, tenant); statement.executeUpdate();
+                connection.commit();
+            } catch (SQLException conflict) {
+                connection.rollback();
+                if (!"23505".equals(conflict.getSQLState())) throw conflict;
+            }
+            try (var query = connection.prepareStatement("SELECT id FROM file_space WHERE tenant_id=? AND space_code='system'")) {
+                query.setString(1, tenant);
+                try (ResultSet result = query.executeQuery()) {
+                    assertThat(result.next()).isTrue(); String id = result.getString(1);
+                    assertThat(result.next()).isFalse(); return id;
+                }
+            }
         }
     }
 

@@ -2,6 +2,9 @@ package com.ai.api.files.client;
 
 import com.ai.api.files.dto.FileUploadResultDTO;
 import com.ai.api.files.dto.FileBusinessFileDTO;
+import com.ai.api.files.dto.FileBusinessRootDTO;
+import com.ai.api.files.dto.FileBusinessRootNodePageDTO;
+import com.ai.api.files.dto.FileBusinessUploadDTO;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +32,18 @@ public interface FilesClient {
      * @return 文件上传结果
      */
     FileUploadResultDTO upload(Resource resource, String filename, String contentType, String bizType, String bizId);
+
+    /** 幂等获取当前租户业务记录的稳定文件根目录。 */
+    FileBusinessRootDTO ensureBusinessRoot(String businessType, String businessId, String displayName);
+
+    /** 将文件上传到业务根目录内由服务端解析的相对目录。 */
+    FileBusinessUploadDTO uploadToBusinessRoot(Resource resource, String filename, String contentType,
+                                                String rootBusinessType, String rootBusinessId,
+                                                String relativePath, String bizType, String bizId);
+
+    /** 分页读取业务根目录内一个父节点的直属节点。 */
+    FileBusinessRootNodePageDTO listBusinessRootNodes(String businessType, String businessId,
+                                                       String parentId, int page, int size);
 
     /**
      * 查询当前租户指定业务记录关联的活动文件。
@@ -58,5 +73,8 @@ public interface FilesClient {
      * @return 包含文件响应头与流式内容的异步响应
      */
     Mono<ResponseEntity<Flux<DataBuffer>>> download(String fileId);
+
+    /** 下载指定文件节点的一个可用历史版本。 */
+    Mono<ResponseEntity<Flux<DataBuffer>>> downloadVersion(String fileId, String versionId);
 
 }

@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,7 +24,8 @@ import java.io.Serial;
 @Setter
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "file_space", comment = "文件空间表")
+@Table(name = "file_space", comment = "文件空间表", uniqueConstraints =
+        @UniqueConstraint(name = "uk_file_space_tenant_code", columnNames = {"tenant_id", "space_code"}))
 public class FileSpace extends DataTenantEntity {
 
     @Serial

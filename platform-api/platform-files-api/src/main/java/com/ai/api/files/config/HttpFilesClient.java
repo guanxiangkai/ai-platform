@@ -2,6 +2,9 @@ package com.ai.api.files.config;
 
 import com.ai.api.files.client.FilesClient;
 import com.ai.api.files.dto.FileBusinessFileDTO;
+import com.ai.api.files.dto.FileBusinessRootDTO;
+import com.ai.api.files.dto.FileBusinessRootNodePageDTO;
+import com.ai.api.files.dto.FileBusinessUploadDTO;
 import com.ai.api.files.dto.FileUploadResultDTO;
 import io.github.guanxiangkai.web.plus.core.model.ApiResponse;
 import org.springframework.core.ParameterizedTypeReference;
@@ -31,6 +34,15 @@ final class HttpFilesClient implements FilesClient {
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<ApiResponse<List<FileBusinessFileDTO>>> BUSINESS_FILES_RESPONSE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<ApiResponse<FileBusinessRootDTO>> BUSINESS_ROOT_RESPONSE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<ApiResponse<FileBusinessUploadDTO>> BUSINESS_UPLOAD_RESPONSE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<ApiResponse<FileBusinessRootNodePageDTO>> BUSINESS_ROOT_NODES_RESPONSE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<ApiResponse<Void>> EMPTY_RESPONSE =
@@ -66,6 +78,49 @@ final class HttpFilesClient implements FilesClient {
     }
 
     @Override
+    public FileBusinessRootDTO ensureBusinessRoot(String businessType, String businessId, String displayName) {
+        ApiResponse<FileBusinessRootDTO> response = request(webClient.post()
+                        .uri(uriBuilder -> uriBuilder.path("/internal/files/business-roots/ensure")
+                                .queryParam("businessType", businessType)
+                                .queryParam("businessId", businessId)
+                                .queryParam("displayName", displayName).build()),
+                BUSINESS_ROOT_RESPONSE, properties.getBusinessFileOperationTimeout(), "确保业务根目录");
+        return requiredData(response, "确保业务根目录");
+    }
+
+    @Override
+    public FileBusinessUploadDTO uploadToBusinessRoot(Resource resource, String filename, String contentType,
+                                                       String rootBusinessType, String rootBusinessId,
+                                                       String relativePath, String bizType, String bizId) {
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("file", resource).filename(filename).contentType(MediaType.parseMediaType(contentType));
+        ApiResponse<FileBusinessUploadDTO> response = request(webClient.post()
+                        .uri(uriBuilder -> uriBuilder.path("/internal/files/business-roots/upload")
+                                .queryParam("rootBusinessType", rootBusinessType)
+                                .queryParam("rootBusinessId", rootBusinessId)
+                                .queryParam("relativePath", relativePath)
+                                .queryParam("bizType", bizType)
+                                .queryParam("bizId", bizId).build())
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .body(BodyInserters.fromMultipartData(body.build())),
+                BUSINESS_UPLOAD_RESPONSE, properties.getUploadTimeout(), "上传业务根目录文件");
+        return requiredData(response, "上传业务根目录文件");
+    }
+
+    @Override
+    public FileBusinessRootNodePageDTO listBusinessRootNodes(String businessType, String businessId,
+                                                              String parentId, int page, int size) {
+        ApiResponse<FileBusinessRootNodePageDTO> response = request(webClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/internal/files/business-roots/nodes")
+                                .queryParam("businessType", businessType)
+                                .queryParam("businessId", businessId)
+                                .queryParamIfPresent("parentId", java.util.Optional.ofNullable(parentId))
+                                .queryParam("page", page).queryParam("size", size).build()),
+                BUSINESS_ROOT_NODES_RESPONSE, properties.getBusinessFileOperationTimeout(), "查询业务根目录节点");
+        return requiredData(response, "查询业务根目录节点");
+    }
+
+    @Override
     public List<FileBusinessFileDTO> activeBusinessFiles(String bizType, String bizId) {
         ApiResponse<List<FileBusinessFileDTO>> response = request(
                 businessFilesRequest(webClient.get(), "/internal/files/business-files", bizType, bizId),
@@ -90,6 +145,12 @@ final class HttpFilesClient implements FilesClient {
                 .retrieve()
                 .toEntityFlux(DataBuffer.class)
                 .timeout(properties.getDownloadResponseTimeout());
+    }
+
+    @Override
+    public Mono<ResponseEntity<Flux<DataBuffer>>> downloadVersion(String fileId, String versionId) {
+        return webClient.get().uri("/internal/files/{fileId}/versions/{versionId}", fileId, versionId)
+                .retrieve().toEntityFlux(DataBuffer.class).timeout(properties.getDownloadResponseTimeout());
     }
 
     private static WebClient.RequestHeadersSpec<?> businessFilesRequest(WebClient.RequestHeadersUriSpec<?> request,

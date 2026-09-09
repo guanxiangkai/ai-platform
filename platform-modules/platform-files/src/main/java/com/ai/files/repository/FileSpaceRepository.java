@@ -24,7 +24,7 @@ import java.util.Optional;
 public interface FileSpaceRepository extends JpaRepository<FileSpace, String> {
 
     /** 按空间编码查询未删除空间。 */
-    Optional<FileSpace> findBySpaceCodeAndDeletedFalse(String spaceCode);
+    Optional<FileSpace> findByTenantIdAndSpaceCodeAndDeletedFalse(String tenantId, String spaceCode);
 
     /** 查询个人空间。 */
     Optional<FileSpace> findBySpaceTypeAndOwnerUserIdAndDeletedFalse(FileSpaceType type, String ownerUserId);
