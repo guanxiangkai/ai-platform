@@ -107,6 +107,11 @@ class FilesServiceBusinessRootsTest {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         });
+        org.mockito.Mockito.doAnswer(invocation -> {
+            java.util.function.Consumer<org.springframework.transaction.TransactionStatus> callback = invocation.getArgument(0);
+            callback.accept(null);
+            return null;
+        }).when(transactions).executeWithoutResult(any());
         uploadService = mock(FileUploadService.class);
         FilesProperties properties = mock(FilesProperties.class);
         when(properties.resolvedMaxFileSizeBytes()).thenReturn(100L);
