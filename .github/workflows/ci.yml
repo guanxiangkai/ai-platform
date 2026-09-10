@@ -108,6 +108,28 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: 在 CI 打包并核验文件服务部署镜像
+        run: |
+          docker build --pull -f docker/Dockerfile \
+            --build-arg JAR_FILE=platform-modules/platform-files/build/libs/platform-files-1.0.0-SNAPSHOT.jar \
+            --build-arg SERVICE_NAME=platform-files \
+            --label org.opencontainers.image.revision=${GITHUB_SHA} \
+            -t platform-files:${GITHUB_SHA} .
+          docker run --rm --entrypoint sh platform-files:${GITHUB_SHA} -c 'java -version && curl --version'
+          mkdir -p build/platform-files-runtime
+          docker save platform-files:${GITHUB_SHA} | gzip > build/platform-files-runtime/platform-files.tar.gz
+          docker image inspect platform-files:${GITHUB_SHA} > build/platform-files-runtime/image.json
+          sha256sum platform-modules/platform-files/build/libs/platform-files-1.0.0-SNAPSHOT.jar build/platform-files-runtime/platform-files.tar.gz > build/platform-files-runtime/sha256sums
+
+      - name: 上传文件服务部署镜像
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-files-runtime-${{ github.sha }}
+          path: build/platform-files-runtime
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
       - name: 上传 platform-files 可部署制品
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
