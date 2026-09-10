@@ -6,6 +6,7 @@ import com.ai.api.files.dto.FileBusinessFileDTO;
 import com.ai.api.files.dto.FileBusinessRootDTO;
 import com.ai.api.files.dto.FileBusinessRootNodePageDTO;
 import com.ai.api.files.dto.FileBusinessUploadDTO;
+import com.ai.api.files.dto.FileBusinessDirectoriesRequestDTO;
 import com.ai.files.service.FilesService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
@@ -52,6 +54,13 @@ public class InternalFilesController {
                                                                @RequestParam String businessId,
                                                                @RequestParam String displayName) {
         return ApiResponse.ok(filesService.ensureBusinessRoot(businessType, businessId, displayName));
+    }
+
+    /** 在已存在业务根目录中幂等创建空目录。 */
+    @PostMapping("/business-roots/directories")
+    public ApiResponse<Void> ensureBusinessDirectories(@RequestBody @jakarta.validation.Valid FileBusinessDirectoriesRequestDTO request) {
+        filesService.ensureBusinessDirectories(request.rootBusinessType(), request.rootBusinessId(), request.relativePaths());
+        return ApiResponse.ok(null);
     }
 
     /** 上传文件到当前租户业务根目录的相对路径。 */

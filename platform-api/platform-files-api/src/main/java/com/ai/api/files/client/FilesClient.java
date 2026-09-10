@@ -46,6 +46,9 @@ public interface FilesClient {
     /** 幂等获取当前租户业务记录的稳定文件根目录。 */
     FileBusinessRootDTO ensureBusinessRoot(String businessType, String businessId, String displayName);
 
+    /** 幂等确保已存在业务根目录中的空目录路径，不创建新的业务根。 */
+    void ensureBusinessDirectories(String rootBusinessType, String rootBusinessId, List<String> relativePaths);
+
     /** 将文件上传到业务根目录内由服务端解析的相对目录。 */
     FileBusinessUploadDTO uploadToBusinessRoot(Resource resource, String filename, String contentType,
                                                 String rootBusinessType, String rootBusinessId,

@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -106,6 +107,11 @@ class FilesServiceBusinessRootsTest {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         });
+        org.mockito.Mockito.doAnswer(invocation -> {
+            java.util.function.Consumer<org.springframework.transaction.TransactionStatus> callback = invocation.getArgument(0);
+            callback.accept(null);
+            return null;
+        }).when(transactions).executeWithoutResult(any());
         uploadService = mock(FileUploadService.class);
         FilesProperties properties = mock(FilesProperties.class);
         when(properties.resolvedMaxFileSizeBytes()).thenReturn(100L);
@@ -156,6 +162,40 @@ class FilesServiceBusinessRootsTest {
         assertThat(other.rootId()).isNotEqualTo(first.rootId());
         assertThat(roots).hasSize(2);
         assertThat(nodesById.get(first.rootId()).getParentId()).isNull();
+    }
+
+    @Test
+    void ensureBusinessDirectoriesShouldRejectMissingRootWithoutCreatingNodes() {
+        assertThatThrownBy(()->service.ensureBusinessDirectories("finance-project","missing",List.of("空目录")))
+                .isInstanceOf(BizException.class).hasMessage("业务根目录不存在");
+        assertThat(nodesById).isEmpty();
+        assertThat(roots).isEmpty();
+    }
+
+    @Test
+    void ensureBusinessDirectoriesShouldCreateNestedEmptyDirectoriesIdempotently() {
+        var root=service.ensureBusinessRoot("finance-project","project-1","项目甲");
+        service.ensureBusinessDirectories("finance-project","project-1",List.of("资料/空目录","资料/另一空目录"));
+        int created=nodesById.size();
+        service.ensureBusinessDirectories("finance-project","project-1",List.of("资料/空目录","资料/另一空目录"));
+        assertThat(nodesById).hasSize(created);
+        assertThat(nodesById.values()).anySatisfy(node->assertThat(node.getDisplayPath()).endsWith("/资料/空目录"));
+        assertThat(root.rootId()).isNotBlank();
+    }
+
+    @Test
+    void ensureBusinessDirectoriesShouldRejectInvalidPathAndFileCollision() {
+        var root=service.ensureBusinessRoot("finance-project","project-1","项目甲");
+        assertThatThrownBy(()->service.ensureBusinessDirectories("finance-project","project-1",List.of("a/../b"))).isInstanceOf(BizException.class);
+        FileNode file=new FileNode();file.setId("file-collision");file.setTenantId("tenant-a");file.setSpaceId("system-space");file.setParentId(root.rootId());file.setNodeName("资料");file.setNodeType(FileNodeType.FILE);file.setNodeState(FileNodeState.ACTIVE);file.setDisplayPath("/项目甲/资料");nodesById.put(file.getId(),file);
+        assertThatThrownBy(()->service.ensureBusinessDirectories("finance-project","project-1",List.of("资料/空目录"))).isInstanceOf(BizException.class).hasMessage("业务目录名称冲突");
+    }
+
+    @Test
+    void ensureBusinessDirectoriesShouldNotCrossTenantRootBinding() {
+        service.ensureBusinessRoot("finance-project","project-1","项目甲");
+        UserContextHolder.set(new UserContext("internal-service","tenant-b",false,null,Set.of(),Set.of(),Set.of(),Map.of()));
+        assertThatThrownBy(()->service.ensureBusinessDirectories("finance-project","project-1",List.of("空目录"))).isInstanceOf(BizException.class);
     }
 
     @Test

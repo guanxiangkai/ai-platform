@@ -629,6 +629,38 @@ public class FilesService {
         }));
     }
 
+    /** 在既有业务根目录中创建受限的空目录；不允许隐式创建业务根。 */
+    public void ensureBusinessDirectories(String rootBusinessType, String rootBusinessId, List<String> relativePaths) {
+        requireInternalService();
+        String type=businessScope(rootBusinessType,64,"根业务类型无效");
+        String id=businessScope(rootBusinessId,128,"根业务标识无效");
+        if(relativePaths==null||relativePaths.isEmpty()||relativePaths.size()>8000)throw new BizException("业务目录数量无效");
+        List<String> paths=relativePaths.stream().map(this::normalizeRelativePath).toList();
+        if(paths.stream().anyMatch(String::isEmpty))throw new BizException("业务目录路径不能为空");
+        transactionTemplate.executeWithoutResult(status->{
+            String spaceId=spaceRepository.findByTenantIdAndSpaceCodeAndDeletedFalse(requireTenantId(),"system")
+                    .orElseThrow(()->new BizException("系统文件空间不存在")).getId();
+            FileSpace space=spaceRepository.findLockedByIdAndTenantId(spaceId,requireTenantId()).orElseThrow(()->new BizException("系统文件空间不存在"));
+            FileNode root=requireBusinessRootNode(requireBusinessRoot(type,id),space);
+            // 同一批次的共同祖先只查询一次，避免目录清单重复遍历放大数据库调用。
+            Map<String,FileNode> resolved=new java.util.HashMap<>();
+            resolved.put("",root);
+            for(String path:paths) {
+                String prefix="";
+                FileNode parent=root;
+                for(String segment:path.split("/")) {
+                    prefix=prefix.isEmpty()?segment:prefix+"/"+segment;
+                    FileNode node=resolved.get(prefix);
+                    if(node==null) {
+                        if(resolved.size()>8000)throw new BizException("业务目录总数超过上限");
+                        node=resolveBusinessPath(space,parent,segment);resolved.put(prefix,node);
+                    }
+                    parent=node;
+                }
+            }
+        });
+    }
+
     /** 上传文件到业务根目录内的相对路径，目录由服务端创建并校验。 */
     public Mono<FileBusinessUploadDTO> uploadToBusinessRoot(FilePart filePart, String rootBusinessType,
                                                              String rootBusinessId, String relativePath,
