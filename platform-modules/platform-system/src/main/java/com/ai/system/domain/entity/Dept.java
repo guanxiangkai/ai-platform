@@ -1,5 +1,7 @@
 package com.ai.system.domain.entity;
 
+import io.github.guanxiangkai.web.plus.core.tree.ParentAware;
+
 import io.github.guanxiangkai.web.plus.core.entity.SortableTenantEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -18,7 +20,7 @@ import lombok.*;
 @EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "sys_dept", comment = "部门表")
-public class Dept extends SortableTenantEntity {
+public class Dept extends SortableTenantEntity implements ParentAware<String> {
 
     /**
      * 部门名称

@@ -1,5 +1,7 @@
 package com.ai.system.domain.entity;
 
+import io.github.guanxiangkai.web.plus.core.tree.ParentAware;
+
 import io.github.guanxiangkai.web.plus.core.entity.DataEntity;
 import io.github.guanxiangkai.web.plus.core.entity.SortInfo;
 import io.github.guanxiangkai.web.plus.core.entity.Sortable;
@@ -30,7 +32,7 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "sys_region", comment = "行政区域表")
-public class Region extends DataEntity implements Sortable {
+public class Region extends DataEntity implements Sortable, ParentAware<String> {
 
     @Serial
     private static final long serialVersionUID = 1L;

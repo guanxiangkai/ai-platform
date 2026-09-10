@@ -2,6 +2,7 @@ package com.ai.system.service.impl;
 
 import io.github.guanxiangkai.web.plus.core.converter.EntityConverter;
 import io.github.guanxiangkai.web.plus.core.model.PageResponse;
+import io.github.guanxiangkai.web.plus.core.tree.TreeAssembler;
 import io.github.guanxiangkai.web.plus.error.exception.BizException;
 import io.github.guanxiangkai.web.plus.security.util.SecurityUtils;
 import io.github.guanxiangkai.web.plus.web.repository.BaseRepository;
@@ -312,91 +313,12 @@ public class MenuServiceImpl extends BaseServiceImpl<MenuPageDTO, MenuPageVO, Me
     }
 
     /**
-     * 构建树形结构。先按 parentId 分组，避免每层递归都全量扫描菜单。
+     * 在租户可见性和导航授权筛选完成后，按平台根节点约定组装菜单树。
      */
     private List<MenuVO> buildTree(List<MenuVO> menus) {
-        if (menus == null || menus.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        Map<String, MenuVO> menuById = new LinkedHashMap<>();
-        for (MenuVO menu : menus) {
-            if (menu == null || !StringUtils.hasText(menu.getId())) {
-                continue;
-            }
-            menu.setChildren(new ArrayList<>());
-            menuById.put(menu.getId(), menu);
-        }
-
-        Map<String, List<MenuVO>> childrenByParent = new HashMap<>();
-        List<MenuVO> roots = new ArrayList<>();
-        Set<String> allIds = menuById.keySet();
-
-        for (MenuVO menu : menuById.values()) {
-            String menuId = menu.getId();
-            String parentId = normalizeParentId(menu.getParentId());
-            if (!StringUtils.hasText(parentId)) {
-                roots.add(menu);
-                continue;
-            }
-            if (menuId.equals(parentId)) {
-                continue;
-            }
-            if (!allIds.contains(parentId)) {
-                continue;
-            }
-            childrenByParent.computeIfAbsent(parentId, key -> new ArrayList<>()).add(menu);
-        }
-
-        childrenByParent.values().forEach(children -> children.sort(MENU_COMPARATOR));
-        roots.sort(MENU_COMPARATOR);
-
-        Set<String> visited = new HashSet<>();
-        Set<String> visiting = new HashSet<>();
-        for (MenuVO root : roots) {
-            attachChildren(root, childrenByParent, visited, visiting);
-        }
-        roots.sort(MENU_COMPARATOR);
-        return roots;
-    }
-
-    private void attachChildren(
-            MenuVO menu,
-            Map<String, List<MenuVO>> childrenByParent,
-            Set<String> visited,
-            Set<String> visiting
-    ) {
-        String menuId = menu.getId();
-        if (!StringUtils.hasText(menuId) || visited.contains(menuId)) {
-            return;
-        }
-        if (!visiting.add(menuId)) {
-            return;
-        }
-
-        List<MenuVO> children = childrenByParent.getOrDefault(menuId, List.of());
-        List<MenuVO> safeChildren = new ArrayList<>(children.size());
-        for (MenuVO child : children) {
-            String childId = child.getId();
-            if (!StringUtils.hasText(childId) || childId.equals(menuId)) {
-                log.warn("菜单树检测到非法子节点，已跳过: parentId={}, childId={}", menuId, childId);
-                continue;
-            }
-            if (visiting.contains(childId)) {
-                log.warn("菜单树检测到循环引用，已跳过子节点: parentId={}, childId={}", menuId, childId);
-                continue;
-            }
-            if (visited.contains(childId)) {
-                log.warn("菜单树检测到重复挂载子节点，已跳过: parentId={}, childId={}", menuId, childId);
-                continue;
-            }
-            attachChildren(child, childrenByParent, visited, visiting);
-            safeChildren.add(child);
-        }
-
-        menu.setChildren(safeChildren);
-        visiting.remove(menuId);
-        visited.add(menuId);
+        return TreeAssembler.assemble(menus, MenuVO::getId,
+                menu -> normalizeParentId(menu.getParentId()), MenuVO::setChildren,
+                parentId -> parentId == null, MENU_COMPARATOR);
     }
 
     private void validateParentId(String currentId, String parentId) {

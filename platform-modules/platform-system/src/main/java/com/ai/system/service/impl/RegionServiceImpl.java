@@ -2,6 +2,7 @@ package com.ai.system.service.impl;
 
 import io.github.guanxiangkai.web.plus.error.exception.BizException;
 import io.github.guanxiangkai.web.plus.core.model.OptionItem;
+import io.github.guanxiangkai.web.plus.core.tree.TreeAssembler;
 import io.github.guanxiangkai.web.plus.web.repository.BaseRepository;
 import io.github.guanxiangkai.web.plus.web.service.impl.BaseServiceImpl;
 import com.ai.system.domain.dto.RegionDTO;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -72,15 +72,8 @@ public class RegionServiceImpl extends BaseServiceImpl<RegionPageDTO, RegionPage
         Region region = repository.findByRegionCodeAndDeletedFalse(code)
                 .orElseThrow(() -> new BizException("区域不存在：" + code));
         RegionVO root = converter.convert(region, RegionVO.class);
-        List<RegionVO> children = buildTree(allRegions, root.getId());
-        RegionVO treeRoot = new RegionVO(
-                root.getId(), root.getRegionCode(), root.getRegionName(), root.getParentId(),
-                root.getRegionLevel(), root.getFullName(), root.getShortName(),
-                root.getLongitude(), root.getLatitude(), root.getZipCode(),
-                root.getEnabled(), root.getSortOrder(), root.getRemark(),
-                root.getCreateTime(), children
-        );
-        return List.of(treeRoot);
+        root.setChildren(buildTree(allRegions, root.getId()));
+        return List.of(root);
     }
 
     @Override
@@ -136,21 +129,7 @@ public class RegionServiceImpl extends BaseServiceImpl<RegionPageDTO, RegionPage
      * 构建树形结构。
      */
     private List<RegionVO> buildTree(List<RegionVO> regions, String parentId) {
-        List<RegionVO> tree = new ArrayList<>();
-        for (RegionVO region : regions) {
-            if (isParentMatch(parentId, region.getParentId())) {
-                List<RegionVO> children = buildTree(regions, region.getId());
-                RegionVO withChildren = new RegionVO(
-                        region.getId(), region.getRegionCode(), region.getRegionName(), region.getParentId(),
-                        region.getRegionLevel(), region.getFullName(), region.getShortName(),
-                        region.getLongitude(), region.getLatitude(), region.getZipCode(),
-                        region.getEnabled(), region.getSortOrder(), region.getRemark(),
-                        region.getCreateTime(), children
-                );
-                tree.add(withChildren);
-            }
-        }
-        return tree;
+        return TreeAssembler.assemble(regions, candidate -> isParentMatch(parentId, candidate));
     }
 
     private boolean isParentMatch(String expectedParentId, String actualParentId) {

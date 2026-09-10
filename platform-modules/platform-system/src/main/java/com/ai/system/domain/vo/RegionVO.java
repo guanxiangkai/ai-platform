@@ -1,5 +1,7 @@
 package com.ai.system.domain.vo;
 
+import io.github.guanxiangkai.web.plus.core.tree.TreeNode;
+
 import com.ai.system.domain.entity.Region;
 import io.github.linpeilie.annotations.AutoMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,7 +27,7 @@ import java.util.List;
 @AllArgsConstructor
 @Schema(description = "行政区域VO")
 @AutoMapper(target = Region.class)
-public class RegionVO implements Serializable {
+public class RegionVO implements Serializable, TreeNode<String, RegionVO> {
     @Serial
     private static final long serialVersionUID = 1L;
 
