@@ -49,11 +49,11 @@ class HttpFilesClientTest {
         FilesClient client = client(request -> {
             captured.set(request);
             if (request.url().getPath().endsWith("policy")) return json(HttpStatus.OK,
-                    "{\"code\":200,\"message\":\"ok\",\"data\":{\"concurrency\":3,\"maxFileSizeBytes\":52428800}}");
+                    "{\"code\":200,\"message\":\"ok\",\"data\":{\"concurrency\":3,\"maxFileSizeBytes\":52428800},\"timestamp\":1}");
             return json(HttpStatus.OK, """
                     {"code":200,"message":"ok","data":{"spaceId":"space","parentId":"parent",
                     "expiresAt":"2030-01-01T00:00:00Z","uploadedFile":{"fileId":"file","versionId":"version",
-                    "originName":"a.txt","size":3,"hash":"abc","url":"/files/file","storeName":null}}}
+                    "originName":"a.txt","contentType":"text/plain","size":3,"hash":"abc","url":"/files/file","storeName":null}},"timestamp":1}
                     """);
         });
         assertThat(client.browserUploadPolicy().concurrency()).isEqualTo(3);
