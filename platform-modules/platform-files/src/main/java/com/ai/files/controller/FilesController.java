@@ -101,7 +101,16 @@ public class FilesController {
             @RequestParam(required = false) String editToken,
             @RequestPart("file") Mono<FilePart> filePart) {
         return filePart.flatMap(file -> filesService.upload(
-                spaceId, parentId, file, businessType, businessId, editToken)).map(ApiResponse::ok);
+                spaceId, parentId, file, businessType, businessId, editToken))
+                .map(result -> new FileUploadResultDTO(result.fileId(),result.versionId(),result.originName(),null,
+                        result.contentType(),result.size(),result.url(),result.hash()))
+                .map(ApiResponse::ok);
+    }
+
+    /** 查询用户可读的当前版本元数据，不返回对象存储键。 */
+    @GetMapping("/{nodeId}/metadata")
+    public ApiResponse<FileUploadResultDTO> metadata(@PathVariable String nodeId) {
+        return ApiResponse.ok(filesService.publicMetadata(nodeId));
     }
 
     /** 下载当前版本。 */

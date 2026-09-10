@@ -44,6 +44,27 @@ import static org.mockito.Mockito.when;
 class HttpFilesClientTest {
 
     @Test
+    void browserUploadOperationsUseTypedJsonAndRestoreExactUploadedVersion() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        FilesClient client = client(request -> {
+            captured.set(request);
+            if (request.url().getPath().endsWith("policy")) return json(HttpStatus.OK,
+                    "{\"code\":200,\"message\":\"ok\",\"data\":{\"concurrency\":3,\"maxFileSizeBytes\":52428800},\"timestamp\":1}");
+            return json(HttpStatus.OK, """
+                    {"code":200,"message":"ok","data":{"spaceId":"space","parentId":"parent",
+                    "expiresAt":"2030-01-01T00:00:00Z","uploadedFile":{"fileId":"file","versionId":"version",
+                    "originName":"a.txt","contentType":"text/plain","size":3,"hash":"abc","url":"/files/file","storeName":null}},"timestamp":1}
+                    """);
+        });
+        assertThat(client.browserUploadPolicy().concurrency()).isEqualTo(3);
+        var target=client.prepareBrowserUploadTarget(new com.ai.api.files.dto.FileBrowserUploadTargetRequestDTO("B","R","owner","a.txt",3,"a".repeat(64)));
+        assertThat(target.uploadedFile().versionId()).isEqualTo("version");
+        assertThat(captured.get().url().getPath()).isEqualTo("/internal/files/browser-uploads/prepare");
+        assertThat(captured.get().headers().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+        assertThat(multipartBody(captured.get())).contains("owner","sha256","sizeBytes");
+    }
+
+    @Test
     void uploadShouldDecodeTypedDtoAndPreserveMultipartRequestHeaders() {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         FilesClient client = client(request -> {

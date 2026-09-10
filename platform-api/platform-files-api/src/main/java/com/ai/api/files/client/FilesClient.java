@@ -21,6 +21,16 @@ import java.util.List;
  */
 public interface FilesClient {
 
+    /** 读取浏览器直传策略，不提供存储凭据。 */
+    com.ai.api.files.dto.FileBrowserUploadPolicyDTO browserUploadPolicy();
+
+    /** 为一个确定原件创建或续期当前租户的用户上传目标。 */
+    com.ai.api.files.dto.FileBrowserUploadTargetDTO prepareBrowserUploadTarget(com.ai.api.files.dto.FileBrowserUploadTargetRequestDTO request);
+
+    /** 校验上传主体及不可变版本，并撤销浏览器写入权限。 */
+    com.ai.api.files.dto.FileBusinessUploadDTO acceptBrowserUpload(com.ai.api.files.dto.FileBrowserUploadAcceptRequestDTO request);
+
+
     /**
      * 上传文件。
      *

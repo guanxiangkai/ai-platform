@@ -18,7 +18,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
  * @since 1.0.0
  */
 @Configuration
-@EnableConfigurationProperties({FilesOssProperties.class, FilesProperties.class})
+@EnableConfigurationProperties({FilesOssProperties.class, FilesProperties.class, BrowserUploadProperties.class})
 public class FilesStorageConfiguration {
 
     /** 创建同步 S3 客户端。 */

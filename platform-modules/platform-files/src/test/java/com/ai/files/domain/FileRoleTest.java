@@ -23,6 +23,16 @@ class FileRoleTest {
     }
 
     @Test
+    void uploaderMayReadAndUploadButCannotEditStructureOrManageGrants() {
+        assertTrue(FileRole.UPLOADER.includes(FileRole.VIEWER));
+        assertTrue(FileRole.UPLOADER.includes(FileRole.UPLOADER));
+        assertFalse(FileRole.UPLOADER.includes(FileRole.EDITOR));
+        assertFalse(FileRole.UPLOADER.includes(FileRole.MANAGER));
+        assertFalse(FileRole.VIEWER.includes(FileRole.UPLOADER));
+        assertTrue(FileRole.EDITOR.includes(FileRole.UPLOADER));
+    }
+
+    @Test
     void maxShouldHandleNullAndReturnHigherRole() {
         assertNull(FileRole.max(null, null));
         assertEquals(FileRole.EDITOR, FileRole.max(null, FileRole.EDITOR));
