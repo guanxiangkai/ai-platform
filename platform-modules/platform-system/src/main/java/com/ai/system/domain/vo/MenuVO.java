@@ -1,5 +1,7 @@
 package com.ai.system.domain.vo;
 
+import io.github.guanxiangkai.web.plus.core.tree.TreeNode;
+
 import io.github.guanxiangkai.web.plus.core.domain.vo.DataVO;
 import com.ai.system.domain.MenuType;
 import com.ai.system.domain.entity.Menu;
@@ -14,7 +16,7 @@ import java.util.List;
 /**
  * 菜单视图对象
  * <p>
- * 继承 {@link DataVO}，复用 id / createTime / updateTime / remark / status / enabled / sortOrder
+ * 继承 {@link DataVO}，复用 id / createTime / updateTime / remark / enabled / sortOrder
  * </p>
  *
  * @author guanxiangkai
@@ -24,7 +26,7 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 @Schema(description = "菜单VO")
 @AutoMapper(target = Menu.class)
-public class MenuVO extends DataVO {
+public class MenuVO extends DataVO implements TreeNode<String, MenuVO> {
 
     @Serial
     private static final long serialVersionUID = 1L;

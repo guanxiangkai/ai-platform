@@ -1,17 +1,18 @@
 package com.ai.system.domain.vo;
 
+import io.github.guanxiangkai.web.plus.core.tree.TreeNode;
+
 import io.github.guanxiangkai.web.plus.core.util.StringUtils;
+import io.github.guanxiangkai.web.plus.core.domain.vo.DataVO;
 import com.ai.system.domain.entity.Dept;
 import io.github.linpeilie.annotations.AutoMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.io.Serial;
-import java.io.Serializable;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -22,30 +23,12 @@ import java.util.List;
  */
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 @Schema(description = "部门VO")
 @AutoMapper(target = Dept.class)
-public class DeptVO implements Serializable {
+public class DeptVO extends DataVO implements TreeNode<String, DeptVO> {
     @Serial
     private static final long serialVersionUID = 1L;
-
-    @Schema(description = "主键ID")
-    private String id;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
-
-    @Schema(description = "备注")
-    private String remark;
-
-    @Schema(description = "是否启用")
-    private Boolean enabled;
-
-    @Schema(description = "排序号")
-    private Integer sortOrder;
 
     @Schema(description = "部门名称")
     private String deptName;

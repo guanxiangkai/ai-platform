@@ -3,6 +3,7 @@ package com.ai.system.service.impl;
 import io.github.guanxiangkai.jpa.plus.interceptor.permission.enums.DataScopeType;
 import io.github.guanxiangkai.web.plus.core.converter.EntityConverter;
 import io.github.guanxiangkai.web.plus.core.model.OptionItem;
+import io.github.guanxiangkai.web.plus.core.tree.TreeAssembler;
 import io.github.guanxiangkai.web.plus.error.exception.BizException;
 import io.github.guanxiangkai.web.plus.security.util.SecurityUtils;
 import io.github.guanxiangkai.web.plus.web.repository.BaseRepository;
@@ -75,7 +76,7 @@ public class DeptServiceImpl extends BaseServiceImpl<DeptPageDTO, DeptPageVO, De
     @Override
     public List<DeptVO> tree() {
         List<DeptVO> deptVOs = EntityConverter.toVoList(repository.findByDeletedFalse(), DeptVO.class);
-        return buildTree(deptVOs, null);
+        return TreeAssembler.assemble(deptVOs, parentId -> parentId == null);
     }
 
     @Override
@@ -211,29 +212,6 @@ public class DeptServiceImpl extends BaseServiceImpl<DeptPageDTO, DeptPageVO, De
             result.add(child.getId());
             collectChildDeptIds(child.getId(), result);
         }
-    }
-
-    /**
-     * 构建树形结构
-     */
-    private List<DeptVO> buildTree(List<DeptVO> depts, String parentId) {
-        List<DeptVO> tree = new ArrayList<>();
-        for (DeptVO dept : depts) {
-            if ((parentId == null && dept.getParentId() == null) ||
-                    (parentId != null && parentId.equals(dept.getParentId()))) {
-                List<DeptVO> children = buildTree(depts, dept.getId());
-                DeptVO withChildren = new DeptVO(
-                        dept.getId(), dept.getCreateTime(), dept.getUpdateTime(), dept.getRemark(),
-                        dept.getEnabled(), dept.getSortOrder(), dept.getDeptName(),
-                        dept.getParentId(), dept.getDeptCode(), dept.getLocation(), dept.getRegionCode(),
-                        dept.getLeaderId(), dept.getLeaderName(),
-                        dept.getPhone(), dept.getEmail(),
-                        dept.getAncestors(), children
-                );
-                tree.add(withChildren);
-            }
-        }
-        return tree;
     }
 
     /**

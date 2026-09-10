@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: guanxiangkai/ai-plus
-          ref: 965f6f6093276a5c3259a385f2c63d6a544f8c3c
+          ref: 14023e00df41b815717a77135aec09833f808afc
           path: .ci/ai-plus
 
       - name: 配置 JDK 25

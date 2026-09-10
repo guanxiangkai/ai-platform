@@ -1,5 +1,7 @@
 package com.ai.system.domain.entity;
 
+import io.github.guanxiangkai.web.plus.core.tree.ParentAware;
+
 import com.ai.system.domain.MenuType;
 import io.github.guanxiangkai.web.plus.core.entity.SortableTenantEntity;
 import jakarta.persistence.Column;
@@ -24,7 +26,7 @@ import java.io.Serial;
 @EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "sys_menu", comment = "菜单表")
-public class Menu extends SortableTenantEntity {
+public class Menu extends SortableTenantEntity implements ParentAware<String> {
 
     @Serial
     private static final long serialVersionUID = 1L;

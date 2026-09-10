@@ -1,5 +1,7 @@
 package com.ai.system.domain.entity;
 
+import io.github.guanxiangkai.web.plus.core.tree.ParentAware;
+
 import io.github.guanxiangkai.jpa.plus.interceptor.permission.enums.DataScopeType;
 import io.github.guanxiangkai.web.plus.core.entity.SortableTenantEntity;
 import jakarta.persistence.*;
@@ -26,7 +28,7 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "sys_post", comment = "岗位表")
-public class Post extends SortableTenantEntity {
+public class Post extends SortableTenantEntity implements ParentAware<String> {
 
     /**
      * 岗位名称
