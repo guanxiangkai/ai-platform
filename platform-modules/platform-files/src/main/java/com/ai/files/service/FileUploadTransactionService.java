@@ -55,6 +55,22 @@ class FileUploadTransactionService {
     private final FileOperationLogRepository operationLogs;
     private final FileAccessService access;
     private final FilesProperties properties;
+    private final com.ai.files.repository.FileBrowserUploadTargetRepository browserTargets;
+
+    /** 暂存目标的子目录也受约束，不能通过创建子目录绕过单原件限制。 */
+    private com.ai.files.domain.entity.FileBrowserUploadTarget browserTarget(FileNode node, String tenantId) {
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        FileNode cursor = node;
+        while (cursor != null) {
+            if (!visited.add(cursor.getId())) throw new BizException("文件目录存在循环");
+            var target = browserTargets.findLockedByIdAndTenantId(cursor.getId(), tenantId).orElse(null);
+            if (target != null) return target;
+            cursor = StringUtils.hasText(cursor.getParentId())
+                    ? nodes.findByIdAndDeletedFalse(cursor.getParentId()).orElseThrow(() -> new BizException("父目录不存在")) : null;
+            if (cursor != null && !tenantId.equals(cursor.getTenantId())) throw new BizException("父目录租户不一致");
+        }
+        return null;
+    }
 
     /** 锁定空间和节点，原子预留配额、版本号和对象键。 */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -62,11 +78,28 @@ class FileUploadTransactionService {
         FileSpace space = spaces.findLockedByIdAndTenantId(command.spaceId(), command.tenantId())
                 .orElseThrow(() -> new BizException("文件空间不存在"));
         FileNode parent = lockedParent(space, command.parentId(), command.tenantId());
-        access.require(space, parent, FileRole.EDITOR);
+        access.require(space, parent, FileRole.UPLOADER);
+        var browserTarget = browserTarget(parent, command.tenantId());
+        if (browserTarget != null) {
+            if (!browserTarget.getId().equals(command.parentId())
+                    || !"OPEN".equals(browserTarget.getStatus()) || !browserTarget.getExpiresAt().isAfter(Instant.now())
+                    || !browserTarget.getUploaderUserId().equals(command.userId())
+                    || !browserTarget.getBusinessType().equals(command.businessType())
+                    || !browserTarget.getBusinessId().equals(command.businessId())
+                    || !browserTarget.getFilename().equals(command.originalName())
+                    || browserTarget.getSizeBytes() != command.sizeBytes()
+                    || !browserTarget.getSha256().equals(command.sha256())) {
+                throw new BizException("上传目标已使用、已过期或原件与预约不一致");
+            }
+        }
+
 
         FileNode found = nodes.findBySpaceIdAndParentIdAndNodeNameAndNodeStateInAndDeletedFalse(
                         space.getId(), parentId(parent), command.originalName(), OCCUPYING_NODE_STATES)
                 .orElse(null);
+        if (browserTarget != null && found != null) {
+            throw new BizException("该原件已上传或正在上传，请读取已有结果");
+        }
         if (found != null && found.getNodeState() == FileNodeState.UPLOADING) {
             throw new BizException("同名文件正在上传");
         }
@@ -170,6 +203,17 @@ class FileUploadTransactionService {
         node.setBusinessId(upload.getBusinessId());
         nodes.save(node);
 
+        var browserTarget = browserTarget(node, upload.getTenantId());
+        if (browserTarget != null) {
+            if (!"OPEN".equals(browserTarget.getStatus()) || !browserTarget.getId().equals(node.getParentId())
+                    || !browserTarget.getUploaderUserId().equals(upload.getOperatorUserId())
+                    || !browserTarget.getSha256().equals(version.getSha256())
+                    || browserTarget.getSizeBytes() != version.getSizeBytes()) {
+                throw new BizException("上传目标在对象保存期间发生变化");
+            }
+            browserTarget.setFileId(node.getId());browserTarget.setVersionId(version.getId());
+            browserTarget.setStatus("UPLOADED");browserTargets.save(browserTarget);
+        }
         settleSpace(space, upload.getReservedBytes(), true);
         upload.setUploadState(FileUploadState.COMPLETED);
         upload.setLeaseExpiresAt(Instant.now());

@@ -38,6 +38,7 @@ class FileUploadTransactionServiceTest {
     private FileUploadRecordRepository uploads;
     private FileEditLockRepository locks;
     private FileUploadTransactionService service;
+    private com.ai.files.repository.FileBrowserUploadTargetRepository browserTargets;
 
     @BeforeEach
     void setUp() {
@@ -46,11 +47,12 @@ class FileUploadTransactionServiceTest {
         versions = mock(FileVersionRepository.class);
         uploads = mock(FileUploadRecordRepository.class);
         locks = mock(FileEditLockRepository.class);
+        browserTargets = mock(com.ai.files.repository.FileBrowserUploadTargetRepository.class);
         service = new FileUploadTransactionService(
                 spaces, nodes, versions, uploads, locks,
                 mock(FileOperationLogRepository.class), mock(FileAccessService.class),
                 new FilesProperties(null, null, null, null, null, null,
-                        null, null, null, null, null));
+                        null, null, null, null, null), browserTargets);
     }
 
     @Test
@@ -96,6 +98,27 @@ class FileUploadTransactionServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("当前文件已存在进行中的上传");
         verify(versions, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void browserTargetRejectsForgeryRepeatAndChildDirectoryEscapeBeforeReservingQuota() {
+        FileSpace space=space();space.setSpaceType(FileSpaceType.SYSTEM);
+        when(spaces.findLockedByIdAndTenantId("space-1","tenant-1")).thenReturn(Optional.of(space));
+        FileNode parent=node();parent.setId("target");parent.setNodeType(FileNodeType.FOLDER);
+        when(nodes.findLockedByIdAndTenantId("target","tenant-1")).thenReturn(Optional.of(parent));
+        var target=new com.ai.files.domain.entity.FileBrowserUploadTarget();target.setId("target");target.setStatus("OPEN");target.setUploaderUserId("user-1");target.setBusinessType("B");target.setBusinessId("R");target.setFilename("report.txt");target.setSizeBytes(128);target.setSha256(command().sha256());target.setExpiresAt(java.time.Instant.now().plusSeconds(60));
+        when(browserTargets.findLockedByIdAndTenantId("target","tenant-1")).thenReturn(Optional.of(target));
+        var good=new FileUploadTransactionService.UploadCommand("tenant-1","user-1","space-1","target","report.txt","text/plain",128,command().sha256(),"B","R",null);
+        var forged=new FileUploadTransactionService.UploadCommand("tenant-1","other","space-1","target","report.txt","text/plain",128,command().sha256(),"B","R",null);
+        assertThatThrownBy(()->service.reserve(forged)).hasMessageContaining("预约不一致");
+        target.setStatus("UPLOADED");assertThatThrownBy(()->service.reserve(good)).hasMessageContaining("已使用");target.setStatus("OPEN");
+        target.setSha256("b".repeat(64));assertThatThrownBy(()->service.reserve(good)).hasMessageContaining("预约不一致");target.setSha256(command().sha256());
+        var child=node();child.setId("child");child.setNodeType(FileNodeType.FOLDER);child.setParentId("target");
+        when(nodes.findLockedByIdAndTenantId("child","tenant-1")).thenReturn(Optional.of(child));when(nodes.findByIdAndDeletedFalse("target")).thenReturn(Optional.of(parent));
+        var bypass=new FileUploadTransactionService.UploadCommand("tenant-1","user-1","space-1","child","report.txt","text/plain",128,command().sha256(),"B","R",null);
+        assertThatThrownBy(()->service.reserve(bypass)).hasMessageContaining("预约不一致");
+        verify(versions,never()).saveAndFlush(any());assertThat(space.getReservedBytes()).isZero();
+        service.reserve(good);verify(versions).saveAndFlush(any());assertThat(space.getReservedBytes()).isEqualTo(128);
     }
 
     private FileUploadTransactionService.UploadCommand command() {

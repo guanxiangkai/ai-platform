@@ -4,6 +4,8 @@ package com.ai.files.domain;
 public enum FileRole {
     /** 可查看和下载。 */
     VIEWER(10),
+    /** 可查看并上传原件，不可重命名、移动、回收或管理目录。 */
+    UPLOADER(15),
     /** 可查看、上传版本、创建、重命名和移动。 */
     EDITOR(20),
     /** 可执行全部编辑操作并管理授权。 */

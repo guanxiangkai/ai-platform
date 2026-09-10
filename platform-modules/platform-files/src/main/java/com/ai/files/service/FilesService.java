@@ -945,7 +945,7 @@ public class FilesService {
                 .orElseThrow(() -> new BizException("文件版本不存在"));
     }
 
-    private FileBusinessRoot businessRootForNode(FileNode node) {
+    FileBusinessRoot businessRootForNode(FileNode node) {
         FileNode current = node;
         while (current != null) {
             FileBusinessRoot root = businessRootRepository
@@ -970,6 +970,14 @@ public class FilesService {
             throw new BizException("文件节点不属于当前租户");
         }
         return node;
+    }
+
+    /** 公开元数据须走用户文件ACL，不暴露对象存储键。 */
+    public FileUploadResultDTO publicMetadata(String nodeId) {
+        FileContext context = readableFile(nodeId);
+        FileVersion version = context.version();
+        return new FileUploadResultDTO(context.node().getId(), version.getId(), version.getOriginalName(), null,
+                version.getContentType(), version.getSizeBytes(), "/files/" + context.node().getId(), version.getSha256());
     }
 
     private FileUploadResultDTO uploadResult(FileNode node, FileVersion version) {
@@ -1037,7 +1045,7 @@ public class FilesService {
         return name;
     }
 
-    private FileSpace systemSpace() {
+    FileSpace systemSpace() {
         if (!accessService.isInternalService()) {
             throw new BizException("仅可信内部服务可以访问系统文件空间");
         }
@@ -1070,7 +1078,7 @@ public class FilesService {
         }
     }
 
-    private FileNode systemBusinessFolder(FileSpace space, String businessType, String businessId) {
+    FileNode systemBusinessFolder(FileSpace space, String businessType, String businessId) {
         String typeScope = firstText(businessType, "general");
         String idScope = firstText(businessId, id());
         return Objects.requireNonNull(transactionTemplate.execute(status -> {

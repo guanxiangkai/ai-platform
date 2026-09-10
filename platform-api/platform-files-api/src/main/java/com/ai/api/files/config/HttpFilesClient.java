@@ -58,6 +58,28 @@ final class HttpFilesClient implements FilesClient {
     }
 
     @Override
+    public com.ai.api.files.dto.FileBrowserUploadPolicyDTO browserUploadPolicy() {
+        return requiredData(request(webClient.get().uri("/internal/files/browser-uploads/policy"),
+                new ParameterizedTypeReference<ApiResponse<com.ai.api.files.dto.FileBrowserUploadPolicyDTO>>() {},
+                properties.getBusinessFileOperationTimeout(), "读取浏览器上传策略"), "读取浏览器上传策略");
+    }
+
+    @Override
+    public com.ai.api.files.dto.FileBrowserUploadTargetDTO prepareBrowserUploadTarget(com.ai.api.files.dto.FileBrowserUploadTargetRequestDTO command) {
+        return requiredData(request(webClient.post().uri("/internal/files/browser-uploads/prepare")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue(command),
+                new ParameterizedTypeReference<ApiResponse<com.ai.api.files.dto.FileBrowserUploadTargetDTO>>() {},
+                properties.getBusinessFileOperationTimeout(), "准备浏览器上传目标"), "准备浏览器上传目标");
+    }
+
+    @Override
+    public FileBusinessUploadDTO acceptBrowserUpload(com.ai.api.files.dto.FileBrowserUploadAcceptRequestDTO command) {
+        return requiredData(request(webClient.post().uri("/internal/files/browser-uploads/accept")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue(command), BUSINESS_UPLOAD_RESPONSE,
+                properties.getBusinessFileOperationTimeout(), "封存浏览器上传原件"), "封存浏览器上传原件");
+    }
+
+    @Override
     public FileUploadResultDTO upload(Resource resource, String filename, String contentType,
                                       String bizType, String bizId) {
         MultipartBodyBuilder body = new MultipartBodyBuilder();
