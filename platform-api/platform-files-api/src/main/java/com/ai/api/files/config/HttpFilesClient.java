@@ -5,6 +5,7 @@ import com.ai.api.files.dto.FileBusinessFileDTO;
 import com.ai.api.files.dto.FileBusinessRootDTO;
 import com.ai.api.files.dto.FileBusinessRootNodePageDTO;
 import com.ai.api.files.dto.FileBusinessUploadDTO;
+import com.ai.api.files.dto.FileBusinessDirectoriesRequestDTO;
 import com.ai.api.files.dto.FileUploadResultDTO;
 import io.github.guanxiangkai.web.plus.core.model.ApiResponse;
 import org.springframework.core.ParameterizedTypeReference;
@@ -108,6 +109,14 @@ final class HttpFilesClient implements FilesClient {
                                 .queryParam("displayName", displayName).build()),
                 BUSINESS_ROOT_RESPONSE, properties.getBusinessFileOperationTimeout(), "确保业务根目录");
         return requiredData(response, "确保业务根目录");
+    }
+
+    @Override
+    public void ensureBusinessDirectories(String rootBusinessType, String rootBusinessId, List<String> relativePaths) {
+        request(webClient.post().uri("/internal/files/business-roots/directories")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(new FileBusinessDirectoriesRequestDTO(rootBusinessType, rootBusinessId, relativePaths)),
+                EMPTY_RESPONSE, properties.getBusinessFileOperationTimeout(), "确保业务目录");
     }
 
     @Override

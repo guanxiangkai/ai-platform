@@ -629,6 +629,21 @@ public class FilesService {
         }));
     }
 
+    /** 在既有业务根目录中创建受限的空目录；不允许隐式创建业务根。 */
+    public void ensureBusinessDirectories(String rootBusinessType, String rootBusinessId, List<String> relativePaths) {
+        requireInternalService();
+        String type=businessScope(rootBusinessType,64,"根业务类型无效");
+        String id=businessScope(rootBusinessId,128,"根业务标识无效");
+        if(relativePaths==null||relativePaths.isEmpty()||relativePaths.size()>8000)throw new BizException("业务目录数量无效");
+        List<String> paths=relativePaths.stream().map(this::normalizeRelativePath).toList();
+        if(paths.stream().anyMatch(String::isEmpty))throw new BizException("业务目录路径不能为空");
+        transactionTemplate.executeWithoutResult(status->{
+            FileSpace space=spaceRepository.findLockedByIdAndTenantId(systemSpace().getId(),requireTenantId()).orElseThrow(()->new BizException("系统文件空间不存在"));
+            FileNode root=requireBusinessRootNode(requireBusinessRoot(type,id),space);
+            for(String path:paths)resolveBusinessPath(space,root,path);
+        });
+    }
+
     /** 上传文件到业务根目录内的相对路径，目录由服务端创建并校验。 */
     public Mono<FileBusinessUploadDTO> uploadToBusinessRoot(FilePart filePart, String rootBusinessType,
                                                              String rootBusinessId, String relativePath,
