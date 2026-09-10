@@ -638,9 +638,26 @@ public class FilesService {
         List<String> paths=relativePaths.stream().map(this::normalizeRelativePath).toList();
         if(paths.stream().anyMatch(String::isEmpty))throw new BizException("业务目录路径不能为空");
         transactionTemplate.executeWithoutResult(status->{
-            FileSpace space=spaceRepository.findLockedByIdAndTenantId(systemSpace().getId(),requireTenantId()).orElseThrow(()->new BizException("系统文件空间不存在"));
+            String spaceId=spaceRepository.findByTenantIdAndSpaceCodeAndDeletedFalse(requireTenantId(),"system")
+                    .orElseThrow(()->new BizException("系统文件空间不存在")).getId();
+            FileSpace space=spaceRepository.findLockedByIdAndTenantId(spaceId,requireTenantId()).orElseThrow(()->new BizException("系统文件空间不存在"));
             FileNode root=requireBusinessRootNode(requireBusinessRoot(type,id),space);
-            for(String path:paths)resolveBusinessPath(space,root,path);
+            // 同一批次的共同祖先只查询一次，避免目录清单重复遍历放大数据库调用。
+            Map<String,FileNode> resolved=new java.util.HashMap<>();
+            resolved.put("",root);
+            for(String path:paths) {
+                String prefix="";
+                FileNode parent=root;
+                for(String segment:path.split("/")) {
+                    prefix=prefix.isEmpty()?segment:prefix+"/"+segment;
+                    FileNode node=resolved.get(prefix);
+                    if(node==null) {
+                        if(resolved.size()>8000)throw new BizException("业务目录总数超过上限");
+                        node=resolveBusinessPath(space,parent,segment);resolved.put(prefix,node);
+                    }
+                    parent=node;
+                }
+            }
         });
     }
 

@@ -165,6 +165,14 @@ class FilesServiceBusinessRootsTest {
     }
 
     @Test
+    void ensureBusinessDirectoriesShouldRejectMissingRootWithoutCreatingNodes() {
+        assertThatThrownBy(()->service.ensureBusinessDirectories("finance-project","missing",List.of("空目录")))
+                .isInstanceOf(BizException.class).hasMessage("业务根目录不存在");
+        assertThat(nodesById).isEmpty();
+        assertThat(roots).isEmpty();
+    }
+
+    @Test
     void ensureBusinessDirectoriesShouldCreateNestedEmptyDirectoriesIdempotently() {
         var root=service.ensureBusinessRoot("finance-project","project-1","项目甲");
         service.ensureBusinessDirectories("finance-project","project-1",List.of("资料/空目录","资料/另一空目录"));
