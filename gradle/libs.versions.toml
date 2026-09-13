@@ -24,7 +24,7 @@ caffeine = "3.2.4"          # Caffeine 本地缓存（一级缓存 / L1）
 logback = "1.6.3"         # Logback 当前稳定版，修复 MDC 鉴别键路径穿越风险
 
 # ─────────────────────────── API 文档 ────────────────────────────
-springdoc = "3.0.3"          # SpringDoc OpenAPI 的 Spring Boot 4.0 稳定线
+springdoc = "3.1.1"          # SpringDoc OpenAPI 的 Spring Boot 4.0 稳定线
 
 # ─────────────────────────── JWT / JOSE ─────────────────────────
 nimbus-jose-jwt = "10.9.1"   # Nimbus JOSE + JWT（ai-auth 直接使用 SignedJWT / RSASSASigner / RSASSAVerifier API）
